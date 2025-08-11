@@ -13,7 +13,7 @@
 
     <div x-data="projectPage()" x-init="init()" class="space-y-6">
 
-        {{-- Настройки проекта (по умолчанию свернуты) --}}
+        {{-- Настройки проекта --}}
         <div class="bg-white border rounded-2xl shadow-soft">
             <div class="px-5 py-3 border-b flex items-center justify-between">
                 <div class="font-medium">Настройки проекта</div>
@@ -185,7 +185,7 @@
                             </ol>
                         </div>
 
-                        {{-- Файлы (мгновенная загрузка) --}}
+                        {{-- Файлы --}}
                         <div>
                             <label class="block text-sm mb-2">Файлы</label>
                             <div class="flex items-center gap-3">
@@ -227,7 +227,7 @@
     <script>
         function projectPage(){
             const headers = {
-                'Accept':'application/json',
+                'Accept':'application/json, text/html;q=0.9',
                 'Content-Type':'application/json',
                 'X-CSRF-TOKEN':'{{ csrf_token() }}'
             };
@@ -271,10 +271,14 @@
                         animation:150, handle:'.cursor-move', draggable:'.column',
                         onEnd: async () => {
                             const order = Array.from(document.querySelectorAll('[data-col]')).map(x=>x.dataset.col);
-                            await fetch('{{ route('columns.reorder',$project) }}', {
+                            const r = await fetch('{{ route('columns.reorder',$project) }}', {
                                 method:'POST', headers, credentials:'same-origin', body: JSON.stringify({ order })
                             });
-                            window.toast?.('Сохранено');
+                            if(r.ok){ window.toast?.('Сохранено'); }
+                            else{
+                                console.error('columns.reorder failed', r.status, await r.text());
+                                window.toast?.('Ошибка сохранения порядка колонок');
+                            }
                         }
                     });
                 },
@@ -286,22 +290,27 @@
                             const toCol  = evt.to.dataset.column;
                             const taskId = evt.item.dataset.id;
                             const order  = Array.from(evt.to.querySelectorAll('.kanban-card')).map(x=>x.dataset.id);
-                            await fetch('{{ route('tasks.move') }}', {
+                            const r = await fetch('{{ route('tasks.move') }}', {
                                 method:'POST', headers, credentials:'same-origin',
                                 body: JSON.stringify({ task_id: taskId, to_column: toCol, new_order: order })
                             });
-                            window.toast?.('Сохранено');
+                            if(r.ok){ window.toast?.('Сохранено'); }
+                            else{
+                                console.error('tasks.move failed', r.status, await r.text());
+                                window.toast?.('Не удалось переместить');
+                            }
                         }
                     });
                 },
 
                 // ---------- проект ----------
                 async saveProject(){
-                    await fetch('{{ route('projects.update',$project) }}', {
+                    const r = await fetch('{{ route('projects.update',$project) }}', {
                         method:'PATCH', headers, credentials:'same-origin',
                         body: JSON.stringify(this.p)
                     });
-                    window.toast?.('Сохранено');
+                    if(r.ok){ window.toast?.('Сохранено'); }
+                    else{ console.error('projects.update failed', r.status, await r.text()); window.toast?.('Ошибка сохранения'); }
                 },
 
                 // ---------- колонки ----------
@@ -311,8 +320,8 @@
                         method:'POST', headers, credentials:'same-origin',
                         body: JSON.stringify(this.newCol)
                     });
-                    const data = await res.json();
-                    if(!data?.column) return;
+                    const data = await res.json().catch(()=>null);
+                    if(!data?.column){ window.toast?.('Ошибка добавления'); return; }
 
                     const c = data.column;
                     const wrapper = document.createElement('div');
@@ -342,30 +351,41 @@
                 },
 
                 async renameColumn(id, name){
-                    await fetch('{{ url('/columns') }}/'+id, {
+                    const r = await fetch('{{ url('/columns') }}/'+id, {
                         method:'PATCH', headers, credentials:'same-origin',
                         body: JSON.stringify({ name })
                     });
+                    if(!r.ok){ console.error('column rename failed', id, await r.text()); window.toast?.('Ошибка сохранения'); return; }
                     window.toast?.('Сохранено');
                 },
 
                 async recolorColumn(id, color){
-                    await fetch('{{ url('/columns') }}/'+id, {
+                    const r = await fetch('{{ url('/columns') }}/'+id, {
                         method:'PATCH', headers, credentials:'same-origin',
                         body: JSON.stringify({ color })
                     });
-                    const header = document.querySelector(`[data-col="${id}"] .col-header`);
-                    if(header) header.style.backgroundColor = color;
-                    window.toast?.('Сохранено');
+                    if(r.ok){
+                        const header = document.querySelector(`[data-col="${id}"] .col-header`);
+                        if(header) header.style.backgroundColor = color;
+                        window.toast?.('Сохранено');
+                    }else{
+                        console.error('column recolor failed', id, await r.text());
+                        window.toast?.('Ошибка сохранения');
+                    }
                 },
 
                 async removeColumn(id){
                     if(!confirm('Удалить колонку?')) return;
-                    await fetch('{{ url('/columns') }}/'+id, {
+                    const r = await fetch('{{ url('/columns') }}/'+id, {
                         method:'DELETE', headers, credentials:'same-origin'
                     });
-                    document.querySelector(`[data-col="${id}"]`)?.remove();
-                    window.toast?.('Сохранено');
+                    if(r.ok){
+                        document.querySelector(`[data-col="${id}"]`)?.remove();
+                        window.toast?.('Сохранено');
+                    }else{
+                        console.error('column delete failed', id, await r.text());
+                        window.toast?.('Ошибка удаления');
+                    }
                 },
 
                 // ---------- модалка ----------
@@ -396,7 +416,11 @@
 
                 openTaskModal(columnId){
                     // генерим токен для загрузок
-                    this.taskForm = { board_id: boardId, column_id: columnId, title:'', details:'', due_at:'', priority:'normal', type:'common', assignee_id:'', draft_token: self.crypto?.randomUUID?.() ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2)) };
+                    this.taskForm = {
+                        board_id: boardId, column_id: columnId, title:'', details:'',
+                        due_at:'', priority:'normal', type:'common', assignee_id:'',
+                        draft_token: self.crypto?.randomUUID?.() ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2))
+                    };
                     this.steps = [];
                     this.uploaded = [];
                     this.lockScroll();
@@ -455,30 +479,68 @@
                     return n.toFixed(n<10&&i>0?1:0)+' '+u[i];
                 },
 
+                // ---------- помощь: подгрузить html карточки по id ----------
+                async appendTaskCard(taskId){
+                    const res = await fetch('{{ url('/tasks') }}/'+taskId, {
+                        headers:{ 'Accept':'text/html' }, credentials:'same-origin'
+                    });
+                    if (!res.ok) return false;
+                    const html = await res.text();
+                    const box = document.querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`);
+                    if (box) box.insertAdjacentHTML('beforeend', html);
+                    return true;
+                },
+
                 // ---------- создание задачи ----------
                 async createTaskFromModal(){
-                    const payload = {
-                        ...this.taskForm,
-                        steps: this.steps
-                    };
-                    const res = await fetch('{{ route('tasks.store') }}', {
-                        method:'POST', headers, credentials:'same-origin',
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-                    if(data?.html){
-                        document.querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`)
+                    const payload = { ...this.taskForm, steps: this.steps };
+
+                    let res, data = null;
+                    try{
+                        res = await fetch('{{ route('tasks.store') }}', {
+                            method:'POST', headers, credentials:'same-origin',
+                            body: JSON.stringify(payload)
+                        });
+                    }catch(e){
+                        window.toast?.('Ошибка сохранения'); console.error(e);
+                        return;
+                    }
+
+                    // пробуем понять, что именно вернул сервер
+                    const ct = res.headers.get('content-type') || '';
+                    if (ct.includes('application/json')) {
+                        data = await res.json().catch(()=>null);
+                    } else if (ct.includes('text/html')) {
+                        data = { html: await res.text() };
+                    }
+
+                    // Вариант 1: пришла разметка карточки
+                    if (data?.html) {
+                        document
+                            .querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`)
                             ?.insertAdjacentHTML('beforeend', data.html);
                         window.toast?.('Сохранено');
                         this.closeTaskModal();
-                    }else{
-                        window.toast?.('Ошибка сохранения');
-                        console.error(data);
+                        return;
                     }
+
+                    // Вариант 2: пришёл JSON с id
+                    if (data && (data.id || data.success === true)) {
+                        if (data.id) { await this.appendTaskCard(data.id); }
+                        window.toast?.('Сохранено');
+                        this.closeTaskModal();
+                        return;
+                    }
+
+                    // Что-то пошло не так — показываем сообщение сервера или общее
+                    const fallback = data?.message || 'Ошибка сохранения';
+                    window.toast?.(fallback);
+                    console.error('Unexpected createTask response:', data, 'status:', res.status, await res.text().catch(()=> ''));
                 },
             }
         }
 
+        // хелперы для инлайн-обработчиков у динамически добавленных колонок
         window.__colRename = (id,val)=>document.querySelector('[x-data]').__x.$data.renameColumn(id,val);
         window.__colRecolor = (id,val)=>document.querySelector('[x-data]').__x.$data.recolorColumn(id,val);
         window.__colRemove  = (id)=>document.querySelector('[x-data]').__x.$data.removeColumn(id);
