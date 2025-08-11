@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Auth;
 
 class Task extends Model
 {
+    use HasFactory;
+
+    // Что можно массово заполнять из запроса
     protected $fillable = [
         'board_id',
         'column_id',
@@ -20,13 +23,42 @@ class Task extends Model
         'steps',
     ];
 
+    // Касты
     protected $casts = [
-        'due_at' => 'date',
         'steps'  => 'array',
+        'due_at' => 'datetime', // хранится как timestamp/date; в JSON вернётся ISO
     ];
 
-    public function board(): BelongsTo   { return $this->belongsTo(TaskBoard::class, 'board_id'); }
-    public function column(): BelongsTo  { return $this->belongsTo(TaskColumn::class, 'column_id'); }
-    public function assignee(): BelongsTo{ return $this->belongsTo(User::class, 'assignee_id'); }
-    public function files(): HasMany     { return $this->hasMany(TaskFile::class); }
+    /**
+     * Гарантируем, что created_by всегда выставлен
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Task $task) {
+            if (empty($task->created_by)) {
+                $task->created_by = Auth::id(); // обязательна аутентификация
+            }
+        });
+    }
+
+    // Связи (по желанию, если используете)
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function assignee()
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    public function board()
+    {
+        return $this->belongsTo(TaskBoard::class, 'board_id');
+    }
+
+    public function column()
+    {
+        return $this->belongsTo(TaskColumn::class, 'column_id');
+    }
 }
