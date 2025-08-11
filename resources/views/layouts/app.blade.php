@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title','VicsorCRM')</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>[x-cloak]{display:none!important}</style>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script>
@@ -17,6 +18,8 @@
             }
         }
     </script>
+
+
 </head>
 <body class="min-h-dvh bg-slate-50 text-slate-900">
 <div class="flex min-h-dvh">
@@ -34,6 +37,8 @@
             <x-nav.link href="{{ route('attributes.index') }}" :active="request()->routeIs('attributes.*')">Атрибуты</x-nav.link>
             <x-nav.link href="{{ route('warehouses.index') }}" :active="request()->routeIs('warehouses.*')">Склады</x-nav.link>
             <x-nav.link href="{{ route('products.index') }}" :active="request()->routeIs('products.*')">Товары</x-nav.link>
+            <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
+
 
             <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
         </nav>
@@ -65,6 +70,7 @@
                 <x-nav.link href="{{ route('attributes.index') }}" :active="request()->routeIs('attributes.*')">Атрибуты</x-nav.link>
                 <x-nav.link href="{{ route('warehouses.index') }}" :active="request()->routeIs('warehouses.*')">Склады</x-nav.link>
                 <x-nav.link href="{{ route('products.index') }}" :active="request()->routeIs('products.*')">Товары</x-nav.link>
+                <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
 
                 <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
             </nav>
@@ -84,5 +90,6 @@
         </div>
     </main>
 </div>
+
 </body>
 </html>

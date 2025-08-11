@@ -12,9 +12,12 @@
     $simplePairs = $product->relationLoaded('attributeValues')
         ? $product->attributeValues->map(fn($v)=>['attribute_id'=>$v->attribute_id,'value_id'=>$v->id])->values()
         : collect();
+
+    $theAction = $action ?? ($product->exists ? route('products.update',$product) : route('products.store'));
+    $theMethod = $method ?? ($product->exists ? 'PUT' : 'POST');
 @endphp
 
-<form method="post" action="{{ $action }}"
+<form method="post" action="{{ $theAction }}"
       x-data="productForm({
         is_variable: @js(old('is_variable', (bool)$product->is_variable)),
         images: @js( (old('images') ?? $product->images?->map(fn($i)=>['id'=>$i->id,'url'=>asset('storage/'.$i->path),'is_primary'=>$i->is_primary])->values() ?? []) ),
@@ -34,10 +37,11 @@
         })->values() ?? []) ),
         attrs: @js($attrsForJs),
       })"
+      x-init="init()"
       class="space-y-8" enctype="multipart/form-data">
 
     @csrf
-    @if(in_array(strtoupper($method),['PUT','PATCH','DELETE'])) @method($method) @endif
+    @if(in_array(strtoupper($theMethod),['PUT','PATCH','DELETE'])) @method($theMethod) @endif
 
     <div class="grid md:grid-cols-2 gap-6">
         <label class="inline-flex items-center gap-2 md:col-span-2">
@@ -103,32 +107,40 @@
         <div class="text-xs text-slate-500 mt-2">Главным может быть только одно изображение.</div>
     </div>
 
-    {{-- Атрибуты простого товара (селекты) --}}
+    {{-- Атрибуты простого товара --}}
     <div x-show="!is_variable" x-cloak>
         <div class="text-lg font-semibold mb-2">Атрибуты</div>
+
         <template x-for="(p,i) in attr_pairs" :key="i">
             <div class="flex items-center gap-3 mb-2">
                 <select class="rounded-xl border px-3 py-2"
-                        x-model.number="p.attribute_id"
-                        @change="p.value_id = null">
+                        x-model.number="attr_pairs[i].attribute_id"
+                        @change="attr_pairs[i].value_id = null">
                     <option value="">— Атрибут —</option>
                     <template x-for="a in attrs" :key="a.id">
-                        <option :value="a.id" x-text="a.name"></option>
+                        <option :value="a.id"
+                                :selected="attr_pairs[i].attribute_id === a.id"
+                                x-text="a.name"></option>
                     </template>
                 </select>
 
                 <select class="rounded-xl border px-3 py-2"
-                        x-model.number="p.value_id">
+                        x-model.number="attr_pairs[i].value_id">
                     <option value="">— Значение —</option>
-                    <template x-for="v in valuesForAttr(p.attribute_id)" :key="v.id">
-                        <option :value="v.id" x-text="v.name"></option>
+                    <template x-for="v in valuesForAttr(attr_pairs[i].attribute_id)" :key="v.id">
+                        <option :value="v.id"
+                                :selected="attr_pairs[i].value_id === v.id"
+                                x-text="v.name"></option>
                     </template>
                 </select>
 
                 <button type="button" class="text-red-600" @click="removeAttrPair(i)">Удалить</button>
 
-                <input type="hidden" :name="`attr_pairs[${i}][attribute_id]`" :value="p.attribute_id || ''">
-                <input type="hidden" :name="`attr_pairs[${i}][value_id]`" :value="p.value_id || ''">
+                {{-- на сервер отправляем только для НЕ вариативного товара --}}
+                <input type="hidden" :name="`attr_pairs[${i}][attribute_id]`"
+                       :value="attr_pairs[i].attribute_id || ''" :disabled="is_variable">
+                <input type="hidden" :name="`attr_pairs[${i}][value_id]`"
+                       :value="attr_pairs[i].value_id || ''" :disabled="is_variable">
             </div>
         </template>
 
@@ -164,37 +176,53 @@
                                 <textarea class="w-full rounded-xl border px-3 py-2" rows="2" x-model="v.description"></textarea>
                             </div>
 
-                            {{-- атрибуты вариации: селекты парами --}}
+                            {{-- атрибуты вариации --}}
                             <div class="md:col-span-2">
                                 <div class="text-sm text-slate-500 mb-1">Атрибуты вариации</div>
 
-                                <template x-for="(p,k) in v.pairs" :key="k">
+                                <template x-for="(pair,k) in variations[idx].pairs" :key="`${idx}-${k}`">
                                     <div class="flex items-center gap-3 mb-2">
                                         <select class="rounded-xl border px-3 py-2"
-                                                x-model.number="p.attribute_id"
-                                                @change="p.value_id=null">
+                                                x-model.number="variations[idx].pairs[k].attribute_id"
+                                                @change="variations[idx].pairs[k].value_id = null">
                                             <option value="">— Атрибут —</option>
                                             <template x-for="a in attrs" :key="a.id">
-                                                <option :value="a.id" x-text="a.name"></option>
+                                                <option :value="a.id"
+                                                        :selected="variations[idx].pairs[k].attribute_id === a.id"
+                                                        x-text="a.name"></option>
                                             </template>
                                         </select>
 
                                         <select class="rounded-xl border px-3 py-2"
-                                                x-model.number="p.value_id">
+                                                x-model.number="variations[idx].pairs[k].value_id">
                                             <option value="">— Значение —</option>
-                                            <template x-for="v2 in valuesForAttr(p.attribute_id)" :key="v2.id">
-                                                <option :value="v2.id" x-text="v2.name"></option>
+                                            <template x-for="v2 in valuesForAttr(variations[idx].pairs[k].attribute_id)" :key="v2.id">
+                                                <option :value="v2.id"
+                                                        :selected="variations[idx].pairs[k].value_id === v2.id"
+                                                        x-text="v2.name"></option>
                                             </template>
                                         </select>
 
-                                        <button type="button" class="text-red-600" @click="v.pairs.splice(k,1)">Удалить</button>
+                                        <button type="button" class="text-red-600"
+                                                @click="variations[idx].pairs.splice(k,1)">
+                                            Удалить
+                                        </button>
 
-                                        <input type="hidden" :name="`variations[${idx}][pairs][${k}][attribute_id]`" :value="p.attribute_id || ''">
-                                        <input type="hidden" :name="`variations[${idx}][pairs][${k}][value_id]`" :value="p.value_id || ''">
+                                        <input type="hidden"
+                                               :name="`variations[${idx}][pairs][${k}][attribute_id]`"
+                                               :value="variations[idx].pairs[k].attribute_id || ''"
+                                               :disabled="!is_variable">
+                                        <input type="hidden"
+                                               :name="`variations[${idx}][pairs][${k}][value_id]`"
+                                               :value="variations[idx].pairs[k].value_id || ''"
+                                               :disabled="!is_variable">
                                     </div>
                                 </template>
 
-                                <button type="button" class="px-3 py-2 rounded-xl border" @click="v.pairs.push({attribute_id:null,value_id:null})">+ Добавить атрибут</button>
+                                <button type="button" class="px-3 py-2 rounded-xl border"
+                                        @click="variations[idx].pairs.push({attribute_id:null,value_id:null})">
+                                    + Добавить атрибут
+                                </button>
                             </div>
 
                             {{-- изображение вариации (одно) --}}
@@ -215,17 +243,17 @@
                         <button type="button" class="text-red-600" @click="removeVariation(idx)">Удалить вариацию</button>
                     </div>
 
-                    {{-- сериализация полей вариации --}}
-                    <input type="hidden" :name="`variations[${idx}][sku]`"         :value="v.sku || ''">
-                    <input type="hidden" :name="`variations[${idx}][barcode]`"     :value="v.barcode || ''">
-                    <input type="hidden" :name="`variations[${idx}][price_regular]`" :value="v.price_regular || 0">
-                    <input type="hidden" :name="`variations[${idx}][price_sale]`"   :value="v.price_sale || ''">
-                    <input type="hidden" :name="`variations[${idx}][weight]`"       :value="v.weight || ''">
-                    <input type="hidden" :name="`variations[${idx}][length]`"       :value="v.length || ''">
-                    <input type="hidden" :name="`variations[${idx}][width]`"        :value="v.width || ''">
-                    <input type="hidden" :name="`variations[${idx}][height]`"       :value="v.height || ''">
-                    <input type="hidden" :name="`variations[${idx}][description]`"  :value="v.description || ''">
-                    <input type="hidden" :name="`variations[${idx}][image_id]`"     :value="v.image_id || ''">
+                    {{-- сериализация полей вариации (отправляем только при is_variable) --}}
+                    <input type="hidden" :name="`variations[${idx}][sku]`"           :value="v.sku || ''"           :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][barcode]`"       :value="v.barcode || ''"       :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][price_regular]`" :value="v.price_regular || 0"  :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][price_sale]`"    :value="v.price_sale || ''"    :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][weight]`"        :value="v.weight || ''"        :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][length]`"        :value="v.length || ''"        :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][width]`"         :value="v.width || ''"         :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][height]`"        :value="v.height || ''"        :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][description]`"   :value="v.description || ''"   :disabled="!is_variable">
+                    <input type="hidden" :name="`variations[${idx}][image_id]`"      :value="v.image_id || ''"      :disabled="!is_variable">
                 </div>
             </template>
         </div>
@@ -245,6 +273,23 @@
             attrs: initial.attrs || [],
             attr_pairs: initial.attr_pairs?.length ? initial.attr_pairs : [{attribute_id:null,value_id:null}],
             variations: initial.variations?.length ? initial.variations : [],
+
+            // --- ВАЖНО: нормализуем значения, чтобы x-model "поймал" selected ---
+            init(){
+                this.attr_pairs = (this.attr_pairs || []).map(p => ({
+                    attribute_id: p.attribute_id !== '' && p.attribute_id != null ? Number(p.attribute_id) : null,
+                    value_id:     p.value_id     !== '' && p.value_id     != null ? Number(p.value_id)     : null,
+                }));
+
+                this.variations = (this.variations || []).map(v => ({
+                    ...v,
+                    price_regular: v.price_regular ?? '',
+                    pairs: (v.pairs || []).map(p => ({
+                        attribute_id: p.attribute_id !== '' && p.attribute_id != null ? Number(p.attribute_id) : null,
+                        value_id:     p.value_id     !== '' && p.value_id     != null ? Number(p.value_id)     : null,
+                    })),
+                }));
+            },
 
             valuesForAttr(attrId){
                 const a = this.attrs.find(x => x.id === Number(attrId));
@@ -292,11 +337,21 @@
             },
             removeVariation(i){ this.variations.splice(i,1); },
 
+            // Заголовок вариации: "Вариация — Цвет: красный, Размер: L — 123.00"
             variationLabel(v){
-                const cnt = (v.pairs || []).filter(p => p.value_id).length;
-                const attrs = cnt ? ` — ${cnt} атр.` : '';
-                const prices = v.price_regular ? ` — ${v.price_regular}` : '';
-                return `Вариация${attrs}${prices}`;
+                const parts = [];
+                (v.pairs || []).forEach(p => {
+                    const a = this.attrs.find(x => x.id === Number(p.attribute_id));
+                    const val = a?.values.find(x => x.id === Number(p.value_id));
+                    if (a && val) parts.push(`${a.name}: ${val.name}`);
+                });
+
+                const attrsText = parts.length ? ' — ' + parts.join(', ') : '';
+                const price = v.price_regular && !isNaN(parseFloat(v.price_regular))
+                    ? ` — ${parseFloat(v.price_regular).toFixed(2)}`
+                    : '';
+
+                return `Вариация${attrsText}${price}`;
             },
 
             async uploadVariationImage(idx, e){

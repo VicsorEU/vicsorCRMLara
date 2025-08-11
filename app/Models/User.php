@@ -21,4 +21,19 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function assignedTasks()
+    {
+        return $this->hasMany(\App\Models\Task::class, 'user_id');
+    }
+
+    public function taskComments()
+    {
+        return $this->hasMany(\App\Models\TaskComment::class, 'user_id');
+    }
+
+    public function timeEntries()
+    {
+        return $this->hasMany(\App\Models\TaskTimeEntry::class, 'user_id');
+    }
 }

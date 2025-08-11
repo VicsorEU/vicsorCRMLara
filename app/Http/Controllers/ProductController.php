@@ -22,13 +22,11 @@ class ProductController extends Controller
 
         $products = Product::query()
             ->when($q, function ($query) use ($q) {
-                // PostgreSQL — регистронезависимо
-                $query->where(fn($q2) =>
-                $q2->where('name', 'ilike', "%{$q}%")
+                $query->where('name', 'ilike', "%{$q}%")
                     ->orWhere('sku', 'ilike', "%{$q}%")
-                    ->orWhere('slug', 'ilike', "%{$q}%")
-                );
+                    ->orWhere('slug', 'ilike', "%{$q}%");
             })
+            ->with(['images' => fn ($q) => $q->orderByDesc('is_primary')->orderBy('sort_order')])
             ->withCount('variations')
             ->orderByDesc('id')
             ->paginate(20)
@@ -58,7 +56,6 @@ class ProductController extends Controller
     public function store(StoreRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        Log::info('PRODUCT STORE VALIDATED', ['data'=>$data]);
 
         DB::transaction(function () use ($data, &$product) {
             $product = Product::create([
@@ -93,9 +90,7 @@ class ProductController extends Controller
 
                 $product->attributeValues()->sync($valueIds);
 
-                Log::info('STORE simple sync ids', ['product_id'=>$product->id, 'valueIds'=>$valueIds]);
                 $actual = $product->attributeValues()->pluck('attribute_values.id')->all();
-                Log::info('STORE simple pivot now', ['product_id'=>$product->id, 'actual'=>$actual]);
             } else {
                 // Вариативный — создаём вариации
                 foreach ($data['variations'] ?? [] as $raw) {
@@ -116,12 +111,6 @@ class ProductController extends Controller
 
                     $variation->values()->sync($vValueIds);
 
-                    Log::info('STORE variation sync', [
-                        'product_id'=>$product->id,
-                        'variation_id'=>$variation->id,
-                        'valueIds'=>$vValueIds,
-                        'actual'=>$variation->values()->pluck('attribute_values.id')->all(),
-                    ]);
 
                     if (!empty($raw['image_id'])) {
                         ProductImage::whereKey($raw['image_id'])->update([
@@ -153,7 +142,6 @@ class ProductController extends Controller
         ]);
 
         $selectedValueIds = $product->attributeValues->pluck('id')->all();
-        \Log::info('EDIT SELECTED VALUE IDS', ['product_id' => $product->id, 'ids' => $selectedValueIds]);
 
         return view('products.edit', [
             'product' => $product,
@@ -169,7 +157,6 @@ class ProductController extends Controller
     public function update(UpdateRequest $request, Product $product): RedirectResponse
     {
         $data = $request->validated();
-        Log::info('PRODUCT UPDATE VALIDATED', ['id'=>$product->id,'data'=>$data]);
 
         DB::transaction(function () use ($data, $product) {
             $product->update([
@@ -203,9 +190,7 @@ class ProductController extends Controller
 
                 $product->attributeValues()->sync($valueIds);
 
-                Log::info('UPDATE simple sync ids', ['product_id'=>$product->id,'valueIds'=>$valueIds]);
                 $actual = $product->attributeValues()->pluck('attribute_values.id')->all();
-                Log::info('UPDATE simple pivot now', ['product_id'=>$product->id,'actual'=>$actual]);
 
                 // Удаляем вариации, если были
                 $product->variations()->each(function ($v) {
@@ -239,12 +224,6 @@ class ProductController extends Controller
 
                     $variation->values()->sync($vValueIds);
 
-                    Log::info('UPDATE variation sync', [
-                        'product_id'=>$product->id,
-                        'variation_id'=>$variation->id,
-                        'valueIds'=>$vValueIds,
-                        'actual'=>$variation->values()->pluck('attribute_values.id')->all(),
-                    ]);
 
                     if (!empty($raw['image_id'])) {
                         ProductImage::whereKey($raw['image_id'])->update([
