@@ -96,6 +96,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/tasks/{task}/comments',   [TaskCommentController::class,'store'])->name('tasks.comments.store');
     Route::delete('/projects/{project}', [ProjectController::class,'destroy'])->name('projects.destroy');
 
+    Route::post('/task-files/upload', [TaskFileController::class, 'upload'])
+        ->name('task-files.upload');
+    Route::delete('/task-files/{attachment}', [TaskFileController::class, 'destroy'])
+        ->name('task-files.destroy');
 
 });
 
