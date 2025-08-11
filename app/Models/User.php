@@ -1,33 +1,24 @@
 <?php
 
-namespace App\Http\Requests\Auth;
+namespace App\Models;
 
-use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+// use Spatie\Permission\Traits\HasRoles; // раскомментируешь, когда подключим роли
 
-class RegisterRequest extends FormRequest
+class User extends Authenticatable
 {
-    public function authorize(): bool { return true; }
+    use HasFactory, Notifiable; // , HasRoles;
 
-    public function rules(): array
+    protected $fillable = ['name', 'email', 'phone', 'company', 'password'];
+    protected $hidden = ['password', 'remember_token'];
+
+    protected function casts(): array
     {
         return [
-            'name'     => ['required', 'string', 'max:191'],
-            'email'    => ['required', 'email:rfc,dns', 'max:191', 'unique:users,email'],
-            'phone'    => ['nullable', 'string', 'max:32', 'unique:users,phone', 'regex:/^\+?[0-9()\-\s]+$/'],
-            'company'  => ['nullable', 'string', 'max:191'],
-            'password' => ['required', Password::min(8)->letters()->numbers()],
-        ];
-    }
-
-    public function attributes(): array
-    {
-        return [
-            'name' => 'Фамилия Имя',
-            'email' => 'Почта',
-            'phone' => 'Телефон',
-            'company' => 'Компания',
-            'password' => 'Пароль',
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
         ];
     }
 }
