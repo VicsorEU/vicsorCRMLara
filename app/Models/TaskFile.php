@@ -4,36 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 class TaskFile extends Model
 {
     protected $fillable = [
-        'task_id',
-        'user_id',
-        'draft_token',
-        'original_name',
-        'path',
-        'size',
-        'mime',
+        'task_id','original_name','path','size','user_id','draft_token','mime',
     ];
-
-    protected $appends = ['url'];
 
     public function task(): BelongsTo
     {
-        return $this->belongsTo(Task::class);
+        return $this->belongsTo(Task::class, 'task_id');
     }
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
-    }
-
-    public function getUrlAttribute(): string
-    {
-        // диск "public" должен быть настроен (стандарт Laravel)
-        return Storage::disk('public')->url($this->path);
-        // либо так, если используешь симлинк storage: return asset('storage/'.$this->path);
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

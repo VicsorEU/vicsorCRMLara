@@ -99,4 +99,13 @@ class TaskController extends Controller
         $task->delete();
         return response()->json(['message' => 'ok']);
     }
+
+    public function show(Task $task)
+    {
+        // Подгружаем нужные связи
+        $task->load(['files','comments.user','assignee','creator','column','timers.user']);
+
+        return view('tasks.show', compact('task'));
+    }
+
 }
