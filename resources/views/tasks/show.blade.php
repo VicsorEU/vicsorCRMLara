@@ -66,7 +66,7 @@
                 </div>
 
                 <div class="md:col-span-3">
-                    <label class="block text-sm mb-1">Описание</label>
+                    <label class="block textсм mb-1">Описание</label>
                     <textarea name="details" rows="4" class="w-full border rounded-lg px-3 py-2">{{ old('details',$task->details) }}</textarea>
                 </div>
 
@@ -247,13 +247,11 @@
                 const ss= String(s%60).padStart(2,'0');
                 return `${h}:${m}:${ss}`;
             };
-            // надёжный парсер дат: убираем микросекунды, нормализуем пробел/T и Z
+            // режем микросекунды, НЕ добавляем «Z», если её нет
             const parseTs = (v) => {
                 if (!v) return NaN;
                 let s = String(v).trim().replace(' ', 'T');
-                // режем микросекунды, но НЕ трогаем уже указанную зону
                 s = s.replace(/\.\d+(Z|[+\-]\d\d:\d\d)?$/, '$1');
-                // без зоны => Date.parse трактует как локальное
                 const t = Date.parse(s);
                 return isNaN(t) ? NaN : t;
             };
@@ -273,7 +271,90 @@
                 return (+h)*3600 + (+m)*60 + (+s);
             };
 
-            // резервы для id активной строки
+            // ---------- Этапы ----------
+            const stepsList = document.getElementById('stepsList');
+            const stepAddBtn = document.getElementById('stepAdd');
+
+            function collectSteps() {
+                return [...document.querySelectorAll('#stepsList .step-item')].map(li => ({
+                    text: li.querySelector('.step-text').value.trim(),
+                    done: li.querySelector('.step-done').checked
+                })).filter(s => s.text.length);
+            }
+            async function saveStepsAjax(silent = true){
+                try{
+                    const fd = new FormData(document.getElementById('taskForm'));
+                    fd.set('steps', JSON.stringify(collectSteps()));
+                    const r = await fetch(saveUrl, {
+                        method:'POST',
+                        headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
+                        body: fd, credentials:'same-origin'
+                    });
+                    if (!silent) toast(r.ok ? 'Этапы сохранены' : 'Не удалось сохранить этапы');
+                }catch(e){
+                    if (!silent) toast('Ошибка сети при сохранении этапов');
+                    console.error(e);
+                }
+            }
+            const debounce = (fn, delay=400) => {
+                let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), delay); };
+            };
+            const debouncedSaveSteps = debounce(()=>saveStepsAjax(true), 400);
+
+            // + Добавить этап
+            stepAddBtn?.addEventListener('click', () => {
+                if (!stepsList) return;
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-2 step-item p-2 rounded';
+                li.innerHTML = `
+            <input type="checkbox" class="step-done">
+            <input type="text" class="flex-1 border rounded-lg px-3 py-2 step-text" placeholder="Шаг">
+            <button type="button" class="px-2 py-1 text-slate-500 hover:text-red-600 step-remove">✕</button>`;
+                stepsList.appendChild(li);
+                li.querySelector('.step-text').focus();
+                // сразу фиксируем добавление (пустые шаги не попадут из-за фильтра)
+                saveStepsAjax(true);
+            });
+
+            // Делегирование: чекбокс — подсветка и сохранение
+            stepsList?.addEventListener('change', (e)=>{
+                const cb = e.target.closest('.step-done');
+                if (!cb) return;
+                const li = cb.closest('.step-item');
+                if (li) li.classList.toggle('bg-green-50', cb.checked);
+                saveStepsAjax(true);
+            });
+
+            // Делегирование: ввод текста — дебаунс-сохранение
+            stepsList?.addEventListener('input', (e)=>{
+                if (!e.target.classList?.contains('step-text')) return;
+                debouncedSaveSteps();
+            });
+
+            // Делегирование: уход с поля — мгновенное сохранение
+            stepsList?.addEventListener('blur', (e)=>{
+                if (!e.target.classList?.contains('step-text')) return;
+                saveStepsAjax(true);
+            }, true);
+
+            // Делегирование: Enter в поле шага — не отправляем форму, сохраняем
+            stepsList?.addEventListener('keydown', (e)=>{
+                if (!e.target.classList?.contains('step-text')) return;
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveStepsAjax(false);
+                }
+            });
+
+            // Делегирование: удалить шаг
+            stepsList?.addEventListener('click', (e)=>{
+                const rm = e.target.closest('.step-remove');
+                if (!rm) return;
+                rm.closest('.step-item')?.remove();
+                saveStepsAjax(true);
+            });
+
+            // ---------- резервы для id активной строки (таймеры) ----------
             const getRunningRow = () => document.querySelector('#timersBody tr.running-row') || activeRow;
             const getRunningRowId = () => (getRunningRow()?.dataset?.id) || null;
 
@@ -311,7 +392,6 @@
             initFromDom();
 
             function ensureActiveRow(userName, started_at, rowId = null){
-                // если уже есть серверная строка — используем её
                 if (!activeRow) {
                     const existed = document.querySelector('#timersBody tr.running-row');
                     if (existed) activeRow = existed;
@@ -323,8 +403,6 @@
                 } else {
                     activeRow.classList.add('running-row');
                 }
-
-                // если уже знаем id (например, бэк его отдаёт на старте) — проставим
                 if (rowId) activeRow.dataset.id = rowId;
 
                 const startedAttr = fmtTs(started_at);
@@ -357,7 +435,6 @@
                 activeRow.setAttribute('data-started', startedAttr);
                 activeRow.setAttribute('data-stopped', stoppedAttr);
 
-                // ← КЛЮЧЕВОЕ: ставим id из payload ИЛИ оставляем существующий из DOM
                 const finalId = id ?? activeRow?.dataset?.id ?? getRunningRowId();
                 if (finalId) activeRow.dataset.id = finalId;
 
@@ -389,7 +466,6 @@
                             const name = document.querySelector('#timersBody tr.running-row td:first-child')?.textContent
                                 || data?.user?.name
                                 || @json(auth()->user()->name);
-                            // если сервер вдруг вернёт id — проставим
                             const rowId = data?.id || data?.timer?.id || null;
                             ensureActiveRow(name, data.started_at, rowId);
                         }
@@ -403,15 +479,12 @@
             setInterval(syncActive, 5000);
             document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) syncActive(); });
 
-            // ---------- сохранить задачу ----------
+            // ---------- сохранить задачу (кнопкой) ----------
             document.getElementById('taskForm').addEventListener('submit', async (e)=>{
                 if (!e.submitter || e.submitter.id !== 'btnSave') return;
                 e.preventDefault();
-                const steps = [...document.querySelectorAll('#stepsList .step-item')].map(li => ({
-                    text: li.querySelector('.step-text').value.trim(),
-                    done: li.querySelector('.step-done').checked
-                })).filter(s => s.text.length);
 
+                const steps = collectSteps();
                 const fd = new FormData(e.currentTarget);
                 fd.append('steps', JSON.stringify(steps));
 
@@ -505,7 +578,7 @@
                     let data = {}; try{ data = await r.json(); }catch(e){}
                     const started = data?.timer?.started_at || data?.started_at || new Date().toISOString();
                     const user    = data?.timer?.user?.name || timersUserName;
-                    const timerId = data?.timer?.id || data?.id || null; // если бэк отдаёт id на старте — используем
+                    const timerId = data?.timer?.id || data?.id || null;
 
                     const ms = parseTs(started);
                     if (!isNaN(ms)) {
@@ -528,7 +601,6 @@
 
             async function stopNow(){
                 try{
-                    // если локально не видим активного таймера — не ходим в сеть
                     const hasRunningDom = !!document.querySelector('#timersBody tr.running-row');
                     if (!activeStartMs && !hasRunningDom) {
                         toast('Таймер не запущен');
@@ -541,20 +613,11 @@
                         credentials:'same-origin'
                     });
 
-                    // сервер может вернуть 204 — это тоже норма
-                    if (r.status === 204) {
-                        toast('Таймер не был запущен');
-                        return;
-                    }
+                    if (r.status === 204) { toast('Таймер не был запущен'); return; }
                     if (!r.ok) { toast('Не удалось остановить'); return; }
 
                     let data = {}; try{ data = await r.json(); }catch(e){}
-
-                    // если бэк вернул "noop" — просто сообщаем и выходим
-                    if (data?.status === 'noop') {
-                        toast('Таймер не был запущен');
-                        return;
-                    }
+                    if (data?.status === 'noop') { toast('Таймер не был запущен'); return; }
 
                     const t = (data && data.timer) ? data.timer : (data || {});
                     const idCandidate = t.id ?? data?.id ?? t.timer_id ?? getRunningRowId() ?? null;
@@ -587,7 +650,7 @@
                 const ms = parseTs(started);
                 if (!isNaN(ms)) {
                     activeStartMs = ms;
-                    ensureActiveRow(@json(auth()->user()->name), started, d.id || null); // пробрасываем id из события, если был
+                    ensureActiveRow(@json(auth()->user()->name), started, d.id || null);
                     tick();
                 }
             });
@@ -601,7 +664,7 @@
                     || document.querySelector('#timersBody tr.running-row')?.getAttribute('data-started')
                     || fmtTs(new Date(activeStartMs || Date.now()).toISOString());
                 const stopped = t.stopped_at || fmtTs(new Date().toISOString());
-                const id      = t.id ?? getRunningRowId() ?? null; // ← резерв из DOM
+                const id      = t.id ?? getRunningRowId() ?? null;
 
                 finalizeActiveRow({ started_at: started, stopped_at: stopped, id });
             });
@@ -670,6 +733,5 @@
 
         })();
     </script>
-
 
 @endsection
