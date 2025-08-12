@@ -83,4 +83,6 @@ Route::middleware('auth')->group(function () {
     // Если используете отдельные эндпоинты для загрузчика файлов:
     Route::post('/task-files/upload',                    [TaskFileController::class, 'upload'])->name('task-files.upload');
     Route::delete('/task-files/{attachment}',            [TaskFileController::class, 'destroy'])->whereNumber('attachment')->name('task-files.destroy');
+    Route::delete('/timers/{timer}', [TimerController::class, 'destroy'])
+        ->name('timers.destroy');
 });

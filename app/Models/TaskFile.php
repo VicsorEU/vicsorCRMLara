@@ -4,12 +4,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class TaskFile extends Model
 {
     protected $fillable = [
         'task_id','original_name','path','size','user_id','draft_token','mime',
     ];
+
+    // чтобы в JSON всегда был url
+    protected $appends = ['url'];
+
+    public function getUrlAttribute(): string
+    {
+        return Storage::disk('public')->url($this->path);
+    }
 
     public function task(): BelongsTo
     {

@@ -35,4 +35,5 @@ class KanbanController extends Controller
 
         return view('kanban.board', compact('board','usersMap'));
     }
+
 }

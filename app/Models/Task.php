@@ -52,4 +52,19 @@ class Task extends Model
         return $this->hasMany(\App\Models\TaskTimer::class, 'task_id')
             ->latest('started_at');
     }
+
+    public function getTotalSecondsAttribute(): int
+    {
+        return $this->timers->sum(
+            fn($t) => (int)($t->duration_sec ?? ($t->stopped_at
+                ? $t->started_at->diffInSeconds($t->stopped_at)
+                : 0))
+        );
+    }
+
+    public function activeTimer()
+    {
+        return $this->timers()->whereNull('stopped_at')->latest('id');
+    }
+
 }

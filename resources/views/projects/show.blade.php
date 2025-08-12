@@ -30,10 +30,12 @@
                             <label class="block text-sm mb-1">Название</label>
                             <input x-model="p.name" class="w-full border rounded-lg px-3 py-2">
                         </div>
+
                         <div>
                             <label class="block text-sm mb-1">Дата начала</label>
                             <input type="date" x-model="p.start_date" class="w-full border rounded-lg px-3 py-2">
                         </div>
+
                         <div>
                             <label class="block text-sm mb-1">Ответственный</label>
                             <select x-model="p.manager_id" class="w-full border rounded-lg px-3 py-2">
@@ -43,12 +45,14 @@
                                 @endforeach
                             </select>
                         </div>
+
                         <div class="md:col-span-3">
                             <label class="block text-sm mb-1">Заметка</label>
                             <textarea x-model="p.note" rows="3" class="w-full border rounded-lg px-3 py-2"></textarea>
                         </div>
-                        <div class="md:col-span-3 flex justify-end">
-                            <button @click="saveProject" class="px-4 py-2 rounded-lg border">Сохранить</button>
+
+                        <div class="md:col-span-3 flex justify-end gap-2">
+                            <button @click="saveProject" class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">Сохранить</button>
                         </div>
                     </div>
                 </div>
@@ -83,7 +87,7 @@
                                        class="w-10 h-8 border rounded cursor-pointer">
 
                                 <button @click="openTaskModal({{ $col->id }})"
-                                        class="ml-auto px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30">+ Добавить задачу</button>
+                                        class="ml-auto px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30">+ Задача</button>
 
                                 <button @click="removeColumn({{ $col->id }})"
                                         class="px-2 text-white/90 hover:text-white">✕</button>
@@ -102,7 +106,7 @@
             </div>
         </div>
 
-        {{-- Модал: Новая задача + Файлы + Этапы --}}
+        {{-- Модал: Новая задача + Файлы (batch) + Этапы --}}
         <div x-show="taskModalOpen" x-cloak class="fixed inset-0 z-[9999]" @keydown.escape.window="closeTaskModal()">
             <div class="fixed inset-0 bg-black/60 backdrop-blur-[1px]" @click="closeTaskModal()"></div>
 
@@ -169,7 +173,7 @@
                             <div class="flex items-center justify-between mb-2">
                                 <label class="block text-sm font-medium">Этапы</label>
                                 <button type="button" class="text-brand-600 hover:text-brand-700 text-sm"
-                                        @click="steps.push('')">+ Добавить этап</button>
+                                        @click="steps.push({text:'' ,done:false})">+ Добавить этап</button>
                             </div>
                             <ol class="space-y-2">
                                 <template x-for="(step,idx) in steps" :key="idx">
@@ -177,7 +181,8 @@
                                         <span class="w-6 text-right text-slate-500" x-text="idx+1"></span>
                                         <input class="flex-1 border rounded-lg px-3 py-2"
                                                :placeholder="`Шаг ${idx+1}`"
-                                               x-model="steps[idx]">
+                                               x-model="steps[idx].text">
+
                                         <button type="button" class="px-2 py-1 text-slate-500 hover:text-red-600"
                                                 @click="steps.splice(idx,1)">✕</button>
                                     </li>
@@ -185,7 +190,7 @@
                             </ol>
                         </div>
 
-                        {{-- Файлы --}}
+                        {{-- Файлы (мгновенная загрузка, множественный выбор) --}}
                         <div>
                             <label class="block text-sm mb-2">Файлы</label>
                             <div class="flex items-center gap-3">
@@ -194,18 +199,21 @@
                             </div>
 
                             <div class="mt-3 grid gap-2">
-                                <template x-for="(f,i) in uploaded" :key="f.id">
+                                <template x-for="(f,i) in uploaded" :key="f.id || i">
                                     <div class="flex items-center justify-between border rounded-lg px-3 py-2">
                                         <div class="min-w-0">
                                             <div class="truncate text-sm" x-text="f.name"></div>
                                             <div class="text-xs text-slate-500" x-text="humanSize(f.size)"></div>
                                         </div>
                                         <div class="flex items-center gap-3 shrink-0">
-                                            <a :href="f.url" target="_blank" class="text-brand-600 text-sm">Открыть</a>
+                                            <template x-if="f.url"><a :href="f.url" target="_blank" class="text-brand-600 text-sm">Открыть</a></template>
                                             <button type="button" class="text-red-600 text-sm"
                                                     @click="removeUploaded(i, f.id)">Удалить</button>
                                         </div>
                                     </div>
+                                </template>
+                                <template x-if="!uploaded.length">
+                                    <div class="text-sm text-slate-500">Файлы не выбраны</div>
                                 </template>
                             </div>
                         </div>
@@ -213,7 +221,8 @@
 
                     <div class="px-5 py-4 border-t flex justify-end gap-2">
                         <button type="button" class="px-4 py-2 rounded-lg border" @click="closeTaskModal()">Отмена</button>
-                        <button class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">Создать</button>
+                        <button class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700"
+                                :disabled="isUploading">Создать</button>
                     </div>
                 </form>
             </div>
@@ -226,12 +235,19 @@
 
     <script>
         function projectPage(){
-            const headers = {
-                'Accept':'application/json, text/html;q=0.9',
+            const headersJson = {
+                'Accept':'application/json',
                 'Content-Type':'application/json',
+                'X-Requested-With':'XMLHttpRequest',
+                'X-CSRF-TOKEN':'{{ csrf_token() }}'
+            };
+            const headersForm = {
+                'Accept':'application/json',
+                'X-Requested-With':'XMLHttpRequest',
                 'X-CSRF-TOKEN':'{{ csrf_token() }}'
             };
             const boardId = {{ $project->board->id }};
+            const toast = (m)=> window.toast ? window.toast(m) : console.log(m);
 
             return {
                 // ---------- state ----------
@@ -257,11 +273,10 @@
                     assignee_id:'',
                     draft_token:'',
                 },
-                steps: [],              // этапы
-                uploaded: [],           // загруженные файлы {id,name,url,size}
+                steps: [],              // [{text,done}]
+                uploaded: [],           // [{id,name,url,size}]
                 isUploading:false,
 
-                // фикс «белой полосы»
                 scrollState: { y: 0, sbw: 0 },
 
                 // ---------- init ----------
@@ -270,15 +285,14 @@
                     new Sortable(document.getElementById('columns'), {
                         animation:150, handle:'.cursor-move', draggable:'.column',
                         onEnd: async () => {
-                            const order = Array.from(document.querySelectorAll('[data-col]')).map(x=>x.dataset.col);
-                            const r = await fetch('{{ route('columns.reorder',$project) }}', {
-                                method:'POST', headers, credentials:'same-origin', body: JSON.stringify({ order })
-                            });
-                            if(r.ok){ window.toast?.('Сохранено'); }
-                            else{
-                                console.error('columns.reorder failed', r.status, await r.text());
-                                window.toast?.('Ошибка сохранения порядка колонок');
-                            }
+                            try{
+                                const order = Array.from(document.querySelectorAll('[data-col]')).map(x=>x.dataset.col);
+                                await fetch('{{ route('columns.reorder',$project) }}', {
+                                    method:'POST', headers:headersJson, credentials:'same-origin',
+                                    body: JSON.stringify({ order })
+                                });
+                                toast('Порядок колонок сохранён');
+                            }catch(e){ console.error(e); toast('Не удалось сохранить порядок колонок'); }
                         }
                     });
                 },
@@ -290,14 +304,18 @@
                             const toCol  = evt.to.dataset.column;
                             const taskId = evt.item.dataset.id;
                             const order  = Array.from(evt.to.querySelectorAll('.kanban-card')).map(x=>x.dataset.id);
-                            const r = await fetch('{{ route('tasks.move') }}', {
-                                method:'POST', headers, credentials:'same-origin',
-                                body: JSON.stringify({ task_id: taskId, to_column: toCol, new_order: order })
-                            });
-                            if(r.ok){ window.toast?.('Сохранено'); }
-                            else{
-                                console.error('tasks.move failed', r.status, await r.text());
-                                window.toast?.('Не удалось переместить');
+
+                            try{
+                                const r = await fetch('{{ route('tasks.move') }}', {
+                                    method:'POST', headers:headersJson, credentials:'same-origin',
+                                    body: JSON.stringify({ task_id: taskId, to_column: toCol, new_order: order })
+                                });
+                                if(!r.ok){ throw new Error(await r.text()); }
+                                toast('Задача перемещена');
+                            }catch(e){
+                                console.error(e);
+                                toast('Не удалось переместить задачу');
+                                location.reload();
                             }
                         }
                     });
@@ -305,87 +323,86 @@
 
                 // ---------- проект ----------
                 async saveProject(){
-                    const r = await fetch('{{ route('projects.update',$project) }}', {
-                        method:'PATCH', headers, credentials:'same-origin',
-                        body: JSON.stringify(this.p)
-                    });
-                    if(r.ok){ window.toast?.('Сохранено'); }
-                    else{ console.error('projects.update failed', r.status, await r.text()); window.toast?.('Ошибка сохранения'); }
+                    try{
+                        const r = await fetch('{{ route('projects.update',$project) }}', {
+                            method:'PATCH', headers:headersJson, credentials:'same-origin',
+                            body: JSON.stringify(this.p)
+                        });
+                        if(!r.ok) throw new Error(await r.text());
+                        toast('Проект сохранён');
+                    }catch(e){ console.error(e); toast('Ошибка сохранения проекта'); }
                 },
 
                 // ---------- колонки ----------
                 async addColumn(){
                     if(!this.newCol.name) return;
-                    const res = await fetch('{{ route('columns.store',$project) }}', {
-                        method:'POST', headers, credentials:'same-origin',
-                        body: JSON.stringify(this.newCol)
-                    });
-                    const data = await res.json().catch(()=>null);
-                    if(!data?.column){ window.toast?.('Ошибка добавления'); return; }
+                    try{
+                        const res = await fetch('{{ route('columns.store',$project) }}', {
+                            method:'POST', headers:headersJson, credentials:'same-origin',
+                            body: JSON.stringify(this.newCol)
+                        });
+                        const data = await res.json();
+                        if(!res.ok || !data?.column) throw new Error(data?.message || 'Ошибка создания колонки');
 
-                    const c = data.column;
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'bg-white border rounded-2xl shadow-soft column';
-                    wrapper.dataset.col = String(c.id);
-                    wrapper.innerHTML = `
-        <div class="px-4 py-3 border-b flex items-center gap-3 col-header text-white rounded-t-2xl"
-             style="background-color:${c.color}">
-          <div class="cursor-move select-none opacity-80">☰</div>
-          <input value="${c.name}" class="flex-1 border rounded-lg px-2 py-1 bg-white text-slate-900"
-                 onchange="window.__colRename(${c.id}, this.value)">
-          <input type="color" value="${c.color}" class="w-10 h-8 border rounded cursor-pointer"
-                 onchange="window.__colRecolor(${c.id}, this.value)">
-          <button class="ml-auto px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30"
-                  onclick="window.__openTaskModal(${c.id})">+ Добавить задачу</button>
-          <button class="px-2 text-white/90 hover:text-white"
-                  onclick="window.__colRemove(${c.id})">✕</button>
-        </div>
-        <div class="p-3">
-          <div class="kanban-column min-h-[120px] space-y-2" data-column="${c.id}"></div>
-        </div>
-      `;
-                    document.getElementById('columns').appendChild(wrapper);
-                    this.attachColumnSortable(wrapper.querySelector('.kanban-column'));
-                    this.newCol = { name:'', color:'#94a3b8' };
-                    window.toast?.('Сохранено');
+                        const c = data.column;
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'bg-white border rounded-2xl shadow-soft column';
+                        wrapper.dataset.col = String(c.id);
+                        wrapper.innerHTML = `
+<div class="px-4 py-3 border-b flex items-center gap-3 col-header text-white rounded-t-2xl" style="background-color:${c.color}">
+  <div class="cursor-move select-none opacity-80">☰</div>
+  <input value="${c.name}" class="flex-1 border rounded-lg px-2 py-1 bg-white text-slate-900"
+         onchange="window.__colRename(${c.id}, this.value)">
+  <input type="color" value="${c.color}" class="w-10 h-8 border rounded cursor-pointer"
+         onchange="window.__colRecolor(${c.id}, this.value)">
+  <button class="ml-auto px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30"
+          onclick="window.__openTaskModal(${c.id})">+ Задача</button>
+  <button class="px-2 text-white/90 hover:text-white" onclick="window.__colRemove(${c.id})">✕</button>
+</div>
+<div class="p-3">
+  <div class="kanban-column min-h-[120px] space-y-2" data-column="${c.id}"></div>
+</div>`;
+                        document.getElementById('columns').appendChild(wrapper);
+                        this.attachColumnSortable(wrapper.querySelector('.kanban-column'));
+                        this.newCol = { name:'', color:'#94a3b8' };
+                        toast('Колонка добавлена');
+                    }catch(e){ console.error(e); toast('Не удалось добавить колонку'); }
                 },
 
                 async renameColumn(id, name){
-                    const r = await fetch('{{ url('/columns') }}/'+id, {
-                        method:'PATCH', headers, credentials:'same-origin',
-                        body: JSON.stringify({ name })
-                    });
-                    if(!r.ok){ console.error('column rename failed', id, await r.text()); window.toast?.('Ошибка сохранения'); return; }
-                    window.toast?.('Сохранено');
+                    try{
+                        const r = await fetch('{{ url('/columns') }}/'+id, {
+                            method:'PATCH', headers:headersJson, credentials:'same-origin',
+                            body: JSON.stringify({ name })
+                        });
+                        if(!r.ok) throw new Error(await r.text());
+                        toast('Название обновлено');
+                    }catch(e){ console.error(e); toast('Не удалось переименовать колонку'); }
                 },
 
                 async recolorColumn(id, color){
-                    const r = await fetch('{{ url('/columns') }}/'+id, {
-                        method:'PATCH', headers, credentials:'same-origin',
-                        body: JSON.stringify({ color })
-                    });
-                    if(r.ok){
+                    try{
+                        const r = await fetch('{{ url('/columns') }}/'+id, {
+                            method:'PATCH', headers:headersJson, credentials:'same-origin',
+                            body: JSON.stringify({ color })
+                        });
+                        if(!r.ok) throw new Error(await r.text());
                         const header = document.querySelector(`[data-col="${id}"] .col-header`);
                         if(header) header.style.backgroundColor = color;
-                        window.toast?.('Сохранено');
-                    }else{
-                        console.error('column recolor failed', id, await r.text());
-                        window.toast?.('Ошибка сохранения');
-                    }
+                        toast('Цвет обновлён');
+                    }catch(e){ console.error(e); toast('Не удалось изменить цвет'); }
                 },
 
                 async removeColumn(id){
                     if(!confirm('Удалить колонку?')) return;
-                    const r = await fetch('{{ url('/columns') }}/'+id, {
-                        method:'DELETE', headers, credentials:'same-origin'
-                    });
-                    if(r.ok){
+                    try{
+                        const r = await fetch('{{ url('/columns') }}/'+id, {
+                            method:'DELETE', headers:headersForm, credentials:'same-origin'
+                        });
+                        if(!r.ok) throw new Error(await r.text());
                         document.querySelector(`[data-col="${id}"]`)?.remove();
-                        window.toast?.('Сохранено');
-                    }else{
-                        console.error('column delete failed', id, await r.text());
-                        window.toast?.('Ошибка удаления');
-                    }
+                        toast('Колонка удалена');
+                    }catch(e){ console.error(e); toast('Не удалось удалить колонку'); }
                 },
 
                 // ---------- модалка ----------
@@ -415,7 +432,6 @@
                 },
 
                 openTaskModal(columnId){
-                    // генерим токен для загрузок
                     this.taskForm = {
                         board_id: boardId, column_id: columnId, title:'', details:'',
                         due_at:'', priority:'normal', type:'common', assignee_id:'',
@@ -431,14 +447,14 @@
                     this.$nextTick(() => this.unlockScroll());
                 },
 
-                // ---------- загрузка файлов ----------
+                // ---------- загрузка файлов (batch) ----------
                 async onPickFiles(e){
                     const files = Array.from(e.target.files || []);
                     if (!files.length) return;
                     for (const f of files) {
                         await this.uploadOne(f);
                     }
-                    e.target.value = ''; // сбрасываем инпут
+                    e.target.value = '';
                 },
 
                 async uploadOne(file){
@@ -447,29 +463,36 @@
                     fd.append('file', file);
                     fd.append('draft_token', this.taskForm.draft_token);
 
-                    const res = await fetch('{{ route('task-files.upload') }}', {
-                        method:'POST',
-                        headers: {'X-CSRF-TOKEN':'{{ csrf_token() }}'},
-                        body: fd,
-                        credentials:'same-origin'
-                    });
+                    try{
+                        const res = await fetch('{{ route('task-files.upload') }}', {
+                            method:'POST',
+                            headers: {'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'},
+                            body: fd, credentials:'same-origin'
+                        });
 
-                    if(res.ok){
-                        const data = await res.json();
-                        this.uploaded.push(data);
-                    }else{
-                        window.toast?.('Не удалось загрузить файл');
-                    }
+                        if(res.ok){
+                            const data = await res.json();
+                            (data.files || []).forEach(x => this.uploaded.push({
+                                id:x.id, name:x.name, url:x.url, size:x.size
+                            }));
+                        }else{
+                            console.error(await res.text());
+                            toast('Не удалось загрузить файл');
+                        }
+                    }catch(e){ console.error(e); toast('Ошибка сети при загрузке'); }
                     this.isUploading = false;
                 },
 
                 async removeUploaded(idx, id){
-                    const res = await fetch('{{ url('/task-files') }}/'+id, {
-                        method:'DELETE',
-                        headers: {'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'},
-                        credentials:'same-origin'
-                    });
-                    if(res.ok) this.uploaded.splice(idx,1);
+                    if(!id){ this.uploaded.splice(idx,1); return; }
+                    try{
+                        const res = await fetch('{{ url('/task-files') }}/'+id, {
+                            method:'DELETE',
+                            headers: {'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'},
+                            credentials:'same-origin'
+                        });
+                        if(res.ok) this.uploaded.splice(idx,1);
+                    }catch(e){ console.error(e); }
                 },
 
                 humanSize(bytes){
@@ -479,68 +502,65 @@
                     return n.toFixed(n<10&&i>0?1:0)+' '+u[i];
                 },
 
-                // ---------- помощь: подгрузить html карточки по id ----------
-                async appendTaskCard(taskId){
-                    const res = await fetch('{{ url('/tasks') }}/'+taskId, {
-                        headers:{ 'Accept':'text/html' }, credentials:'same-origin'
-                    });
-                    if (!res.ok) return false;
-                    const html = await res.text();
-                    const box = document.querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`);
-                    if (box) box.insertAdjacentHTML('beforeend', html);
-                    return true;
+                escapeHtml(s){
+                    return String(s).replace(/[&<>"']/g, m =>
+                        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])
+                    );
                 },
 
                 // ---------- создание задачи ----------
                 async createTaskFromModal(){
-                    const payload = { ...this.taskForm, steps: this.steps };
+                    const payload = {
+                        ...this.taskForm,
+                        steps: this.steps
+                    };
+                    const colEl = document.querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`);
+                    if (!colEl) { toast('Колонка не найдена'); return; }
 
-                    let res, data = null;
                     try{
-                        res = await fetch('{{ route('tasks.store') }}', {
-                            method:'POST', headers, credentials:'same-origin',
+                        const res = await fetch('{{ route('tasks.store') }}', {
+                            method:'POST', headers:headersJson, credentials:'same-origin',
                             body: JSON.stringify(payload)
                         });
+                        let data = {};
+                        try { data = await res.json(); } catch(e) {}
+
+                        if(!res.ok){
+                            throw new Error(data?.message || 'Ошибка сохранения');
+                        }
+
+                        // 1) Если бэкенд вернул готовый html — используем его
+                        let html = data?.html;
+
+                        // 2) Иначе — строим минимальную карточку сами
+                        if(!html){
+                            const id = data?.id;
+                            const title = this.escapeHtml(this.taskForm.title || ('Задача #'+id));
+                            const href  = @json(url('/tasks')) + '/' + id;
+                            html = `
+<a href="${href}"
+   class="block bg-white border rounded-xl hover:shadow-soft transition p-3 kanban-card"
+   data-id="${id}">
+  <div class="font-medium">${title}</div>
+  <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-600"></div>
+</a>`;
+                        }
+
+                        colEl.insertAdjacentHTML('beforeend', html);
+
+                        // Закрываем модалку и показываем тост
+                        this.closeTaskModal();
+                        toast('Задача добавлена');
+
                     }catch(e){
-                        window.toast?.('Ошибка сохранения'); console.error(e);
-                        return;
+                        console.error(e);
+                        toast(e?.message || 'Ошибка сохранения');
                     }
-
-                    // пробуем понять, что именно вернул сервер
-                    const ct = res.headers.get('content-type') || '';
-                    if (ct.includes('application/json')) {
-                        data = await res.json().catch(()=>null);
-                    } else if (ct.includes('text/html')) {
-                        data = { html: await res.text() };
-                    }
-
-                    // Вариант 1: пришла разметка карточки
-                    if (data?.html) {
-                        document
-                            .querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`)
-                            ?.insertAdjacentHTML('beforeend', data.html);
-                        window.toast?.('Сохранено');
-                        this.closeTaskModal();
-                        return;
-                    }
-
-                    // Вариант 2: пришёл JSON с id
-                    if (data && (data.id || data.success === true)) {
-                        if (data.id) { await this.appendTaskCard(data.id); }
-                        window.toast?.('Сохранено');
-                        this.closeTaskModal();
-                        return;
-                    }
-
-                    // Что-то пошло не так — показываем сообщение сервера или общее
-                    const fallback = data?.message || 'Ошибка сохранения';
-                    window.toast?.(fallback);
-                    console.error('Unexpected createTask response:', data, 'status:', res.status, await res.text().catch(()=> ''));
                 },
             }
         }
 
-        // хелперы для инлайн-обработчиков у динамически добавленных колонок
+        // Глобальные прокси для динамически добавленных колонок
         window.__colRename = (id,val)=>document.querySelector('[x-data]').__x.$data.renameColumn(id,val);
         window.__colRecolor = (id,val)=>document.querySelector('[x-data]').__x.$data.recolorColumn(id,val);
         window.__colRemove  = (id)=>document.querySelector('[x-data]').__x.$data.removeColumn(id);

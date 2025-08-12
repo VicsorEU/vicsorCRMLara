@@ -5,71 +5,108 @@ namespace App\Http\Controllers;
 use App\Models\{Task, TaskTimer};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;
 
 class TimerController extends Controller
 {
-    // Старт таймера (поддержка ручного старта)
-    public function start(Request $r, Task $task)
+    public function start(Task $task)
     {
-        // Останавливаем предыдущие активные таймеры пользователя
-        TaskTimer::where('user_id',Auth::id())->whereNull('stopped_at')->get()->each->stopNow();
-
-        $manual = (bool) $r->boolean('manual');
-        $startedAt = $manual && $r->filled('started_at') ? $r->date('started_at') : now();
-
-        TaskTimer::create([
-            'task_id'    => $task->id,
-            'user_id'    => Auth::id(),
-            'started_at' => $startedAt,
-            'manual'     => $manual,
+        $t = $task->timers()->create([
+            'user_id'    => auth()->id(),
+            'started_at' => now(),
         ]);
 
-        return back()->with('ok','Таймер запущен');
-    }
-
-    // Стоп таймера (поддержка ручного стопа)
-    public function stop(Request $r, Task $task)
-    {
-        $manual = (bool) $r->boolean('manual');
-
-        $timer = TaskTimer::where('user_id',Auth::id())
-            ->where('task_id',$task->id)
-            ->whereNull('stopped_at')
-            ->latest()
-            ->first();
-
-        if (!$timer && $manual && $r->filled('started_at')) {
-            // Если старт был "в прошлом" и активного таймера нет — создаём и сразу стопим
-            $timer = TaskTimer::create([
-                'task_id'    => $task->id,
-                'user_id'    => Auth::id(),
-                'started_at' => $r->date('started_at'),
-                'manual'     => true,
+        if (request()->wantsJson()) {
+            $task->load('timers.user');
+            return response()->json([
+                'ok'            => true,
+                'timer'         => $t,
+                'total_seconds' => $task->total_seconds,   // без «тика», тикаем на клиенте
             ]);
         }
+        return back();
+    }
 
-        if ($timer) {
-            if ($manual && $r->filled('stopped_at')) {
-                $timer->stopped_at  = $r->date('stopped_at');
-                $timer->duration_sec = (int) max(0, $timer->started_at->diffInSeconds($timer->stopped_at));
-                $timer->save();
-            } else {
-                $timer->stopNow();
-            }
+    public function stop(Request $r, Task $task)
+    {
+        if ($r->boolean('manual')) {
+            $t = $task->timers()->create([
+                'user_id'    => auth()->id(),
+                'started_at' => $r->date('started_at'),
+                'stopped_at' => $r->date('stopped_at'),
+            ]);
+        } else {
+            $t = $task->timers()->whereNull('stopped_at')->latest('id')->firstOrFail();
+            $t->update(['stopped_at' => now()]);
         }
 
-        return back()->with('ok','Таймер остановлен');
+        $task->load('timers.user');
+
+        if ($r->wantsJson()) {
+            return response()->json([
+                'ok'            => true,
+                'row'           => view('tasks._timer_row', ['t' => $t])->render(),
+                'total_seconds' => $task->total_seconds,
+            ]);
+        }
+        return back();
     }
 
-    // Для мини-виджета таймера
-    public function active()
+    public function active() // уже есть роут GET /timer/active
     {
-        $t = TaskTimer::where('user_id',Auth::id())->whereNull('stopped_at')->latest()->first();
+        $t = \App\Models\TaskTimer::with('task')
+            ->whereNull('stopped_at')
+            ->where('user_id', auth()->id())
+            ->latest('id')->first();
 
         return response()->json([
-            'active'      => (bool) $t,
-            'task_id'     => $t?->task_id,
-            'started_at'  => $t?->started_at?->toIso8601String(),
+            'timer'         => $t ? [
+                'id'         => $t->id,
+                'task_id'    => $t->task_id,
+                'task_title' => $t->task->title ?? ('Задача #'.$t->task_id),
+                'started_at' => $t->started_at,
+            ] : null,
         ]);
     }
+
+    public function destroy(TaskTimer $timer, Request $request): JsonResponse
+    {
+        // (опционально) доступ только своему таймеру
+        // if ($timer->user_id !== auth()->id()) {
+        //     return response()->json(['message' => 'Forbidden'], 403);
+        // }
+
+        // Нельзя удалять «идущий» таймер
+        if (is_null($timer->stopped_at)) {
+            return response()->json(['message' => 'Сначала остановите таймер'], 422);
+        }
+
+        // посчитаем длительность, чтобы на фронте вычесть её из общего времени
+        $duration = 0;
+        try {
+            if (method_exists($timer, 'getAttribute') && $timer->getAttribute('duration_sec') !== null) {
+                $duration = (int) $timer->duration_sec;
+            } elseif ($timer->started_at && $timer->stopped_at) {
+                $start = $timer->started_at instanceof \Carbon\Carbon ? $timer->started_at : \Carbon\Carbon::parse($timer->started_at);
+                $stop  = $timer->stopped_at instanceof \Carbon\Carbon ? $timer->stopped_at  : \Carbon\Carbon::parse($timer->stopped_at);
+                $duration = max(0, $stop->diffInSeconds($start));
+            }
+        } catch (\Throwable $e) {
+            // не критично, просто не вернём duration
+            $duration = 0;
+        }
+
+        $id     = $timer->id;
+        $taskId = $timer->task_id;
+
+        $timer->delete();
+
+        return response()->json([
+            'message'       => 'ok',
+            'deleted_id'    => $id,
+            'task_id'       => $taskId,
+            'duration_sec'  => $duration,
+        ]);
+    }
+
 }

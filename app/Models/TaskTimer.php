@@ -20,4 +20,13 @@ class TaskTimer extends Model
         $this->duration_sec = (int) max(0, $this->started_at->diffInSeconds($this->stopped_at));
         $this->save();
     }
+
+    public function getDurationSecAttribute(): int
+    {
+        if ($this->started_at && $this->stopped_at) {
+            return $this->started_at->diffInSeconds($this->stopped_at);
+        }
+        return 0;
+    }
+
 }

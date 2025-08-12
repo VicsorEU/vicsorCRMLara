@@ -2,12 +2,65 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Task;
 use App\Models\TaskFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class TaskFileController extends Controller
 {
+    /**
+     * Загрузка файлов сразу в задачу (множественная).
+     * Маршрут: POST /tasks/{task}/files  ->  tasks.files.store
+     */
+    public function store(Request $request, Task $task)
+    {
+        // поддержим и один файл (file), и массив (files[])
+        $hasMany = $request->hasFile('files');
+        $hasOne  = $request->hasFile('file');
+
+        if (!$hasMany && !$hasOne) {
+            return response()->json(['message' => 'Файл(ы) не переданы'], 422);
+        }
+
+        $rules = $hasMany
+            ? ['files' => ['required','array'], 'files.*' => ['file','max:20480']]     // 20 МБ на файл
+            : ['file'  => ['required','file','max:20480']];
+
+        $validated = $request->validate($rules);
+
+        $files = $hasMany ? $request->file('files') : [$request->file('file')];
+
+        $result = [];
+        foreach ($files as $uploaded) {
+            $stored = $uploaded->store('attachments/'.$task->id, 'public');
+
+            $rec = TaskFile::create([
+                'user_id'       => $request->user()->id,
+                'task_id'       => $task->id,
+                'draft_token'   => null,
+                'original_name' => $uploaded->getClientOriginalName(),
+                'path'          => $stored,
+                'size'          => $uploaded->getSize(),
+                'mime'          => $uploaded->getMimeType(),
+            ]);
+
+            $result[] = [
+                'id'   => $rec->id,
+                'name' => $rec->original_name,
+                'url'  => $rec->url, // из аксессора
+                'size' => $rec->size,
+                'mime' => $rec->mime,
+            ];
+        }
+
+        return response()->json(['files' => $result]);
+    }
+
+    /**
+     * Временная загрузка (драфт), когда задача ещё не создана.
+     * Маршрут: POST /task-files/upload  -> task-files.upload
+     */
     public function upload(Request $request)
     {
         $request->validate([
@@ -15,11 +68,11 @@ class TaskFileController extends Controller
             'draft_token' => ['required','string','max:100'],
         ]);
 
-        $stored = $request->file('file')->store('attachments', 'public');
+        $stored = $request->file('file')->store('attachments/drafts', 'public');
 
         $file = TaskFile::create([
             'user_id'       => $request->user()->id,
-            'task_id'       => null, // пока не связана
+            'task_id'       => null,
             'draft_token'   => $request->string('draft_token'),
             'original_name' => $request->file('file')->getClientOriginalName(),
             'path'          => $stored,
@@ -28,20 +81,29 @@ class TaskFileController extends Controller
         ]);
 
         return response()->json([
-            'id'   => $file->id,
-            'name' => $file->original_name,
-            'url'  => $file->url,
-            'size' => $file->size,
-            'mime' => $file->mime,
+            'files' => [[
+                'id'   => $file->id,
+                'name' => $file->original_name,
+                'url'  => $file->url,
+                'size' => $file->size,
+                'mime' => $file->mime,
+            ]],
         ]);
     }
 
-    public function destroy(TaskFile $attachment)
+    /**
+     * Удаление файла.
+     * Маршрут: DELETE /files/{file}  -> tasks.files.delete
+     */
+    public function destroy(TaskFile $file)
     {
-        abort_unless($attachment->user_id === auth()->id(), 403);
+        // Разрешим удалять владельцу файла; при желании — добавь политику/проверку прав
+        if ($file->user_id !== auth()->id()) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
-        Storage::disk('public')->delete($attachment->path);
-        $attachment->delete();
+        Storage::disk('public')->delete($file->path);
+        $file->delete();
 
         return response()->json(['ok' => true]);
     }
