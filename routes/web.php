@@ -68,7 +68,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/tasks',                  [TaskController::class, 'store'])->name('tasks.store');
     Route::get('/tasks/{task}',            [TaskController::class, 'show'])->whereNumber('task')->name('tasks.show');
-    Route::patch('/tasks/{task}',          [TaskController::class, 'update'])->whereNumber('task')->name('tasks.update');
+    Route::post('/tasks/{task}',          [TaskController::class, 'update'])->whereNumber('task')->name('tasks.update');
 
     Route::post('/tasks/{task}/timer/start',[TimerController::class,'start'])->whereNumber('task')->name('kanban.timer.start');
     Route::post('/tasks/{task}/timer/stop', [TimerController::class,'stop'])->whereNumber('task')->name('kanban.timer.stop');
@@ -76,6 +76,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/tasks/{task}/files',    [TaskFileController::class,'store'])->whereNumber('task')->name('tasks.files.store');
     Route::delete('/files/{file}',        [TaskFileController::class,'destroy'])->whereNumber('file')->name('tasks.files.delete');
+    Route::delete('/tasks/{task}',       [TaskController::class, 'destroy'])->name('tasks.destroy');
 
     Route::post('/tasks/{task}/comments', [TaskCommentController::class,'store'])->whereNumber('task')->name('tasks.comments.store');
 

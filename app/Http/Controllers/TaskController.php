@@ -76,28 +76,51 @@ class TaskController extends Controller
     public function update(Request $request, Task $task)
     {
         $data = $request->validate([
-            'title'      => ['sometimes','string','max:255'],
-            'details'    => ['sometimes','nullable','string'],
-            'due_at'     => ['sometimes','nullable','date'],
-            'priority'   => ['sometimes','string'],
-            'type'       => ['sometimes','string'],
-            'assignee_id'=> ['sometimes','nullable','integer'],
-            'steps'      => ['sometimes','array'],
+            'title'       => 'required|string|max:255',
+            'type'        => 'required|string',
+            'priority'    => 'required|string',
+            'assignee_id' => 'nullable|exists:users,id',
+            'details'     => 'nullable|string',
+            'due_at'      => 'nullable|date',
+            'steps'       => 'nullable', // придёт JSON-строкой
         ]);
 
-        if (array_key_exists('due_at', $data) && $data['due_at']) {
-            $data['due_at'] = Carbon::parse($data['due_at'])->toDateString();
+        // steps может прийти строкой JSON -> в массив
+        if (isset($data['steps']) && is_string($data['steps'])) {
+            $decoded = json_decode($data['steps'], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $data['steps'] = $decoded;
+            } else {
+                unset($data['steps']);
+            }
         }
 
-        $task->update($data);
+        $task->fill($data);
+        $task->save();
 
-        return response()->json(['message' => 'ok']);
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'ok']);
+        }
+        return back()->with('ok', 'Сохранено');
     }
 
-    public function destroy(Task $task)
+    public function destroy(Request $request, Task $task)
     {
+        // удаляем прикреплённые файлы с диска
+        foreach ($task->files as $f) {
+            if ($f->path) {
+                Storage::disk('public')->delete($f->path);
+            }
+            $f->delete();
+        }
+
+        $boardId = $task->board_id;
         $task->delete();
-        return response()->json(['message' => 'ok']);
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'deleted']);
+        }
+        return redirect()->route('kanban.show', $boardId);
     }
 
     public function show(Task $task)
