@@ -188,8 +188,8 @@
                         @php $d = (int)($t->duration_sec ?? 0); @endphp
                         <tr class="border-t {{ $t->stopped_at ? '' : 'running-row' }}"
                             data-id="{{ $t->id }}"
-                            data-started="{{ $t->started_at }}"
-                            data-stopped="{{ $t->stopped_at }}">
+                            data-started="{{ optional($t->started_at)->toIso8601String() }}"
+                            data-stopped="{{ optional($t->stopped_at)->toIso8601String() }}">
                             <td class="py-2 pr-4">{{ $t->user->name ?? ('Пользователь #'.$t->user_id) }}</td>
                             <td class="py-2 pr-4">{{ $t->started_at }}</td>
                             <td class="py-2 pr-4">{{ $t->stopped_at ?? '—' }}</td>
@@ -251,16 +251,15 @@
             const parseTs = (v) => {
                 if (!v) return NaN;
                 let s = String(v).trim().replace(' ', 'T');
-                // срезаем микросекунды: 2025-08-12T12:34:56.123456Z -> ...56Z
-                s = s.replace(/\.\d+(Z)?$/, '$1');
-                // если нет зоны - считаем, что это UTC
-                if (!/[zZ]|[+\-]\d\d:\d\d$/.test(s)) s += 'Z';
+                // режем микросекунды, но НЕ трогаем уже указанную зону
+                s = s.replace(/\.\d+(Z|[+\-]\d\d:\d\d)?$/, '$1');
+                // без зоны => Date.parse трактует как локальное
                 const t = Date.parse(s);
                 return isNaN(t) ? NaN : t;
             };
             const fmtTs = v => {
                 const ms = parseTs(v);
-                const d = isNaN(ms) ? new Date() : new Date(ms); // покажем локальное пользователю
+                const d = isNaN(ms) ? new Date() : new Date(ms);
                 const y = d.getFullYear();
                 const M = String(d.getMonth()+1).padStart(2,'0');
                 const D = String(d.getDate()).padStart(2,'0');
@@ -269,15 +268,18 @@
                 const s = String(d.getSeconds()).padStart(2,'0');
                 return `${y}-${M}-${D} ${h}:${m}:${s}`;
             };
-
             const durFromText = (txt) => {
                 const [h='0', m='0', s='0'] = String(txt).split(':');
                 return (+h)*3600 + (+m)*60 + (+s);
             };
 
+            // резервы для id активной строки
+            const getRunningRow = () => document.querySelector('#timersBody tr.running-row') || activeRow;
+            const getRunningRowId = () => (getRunningRow()?.dataset?.id) || null;
+
             // ---------- totals ----------
-            let baseTotal = {{ (int)($task->total_seconds ?? 0) }}; // завершённые
-            let activeStartMs = null;                                // если таймер идёт
+            let baseTotal = {{ (int)($task->total_seconds ?? 0) }};
+            let activeStartMs = null;
 
             const totalEl   = document.getElementById('totalTimeText');
             const timersBody= document.getElementById('timersBody');
@@ -299,7 +301,6 @@
                 const row = document.querySelector('#timersBody tr.running-row');
                 if (!row) return;
                 activeRow = row;
-                // ВНИМАНИЕ: в разметке data-started, НЕ data-started_at
                 const ds = row.getAttribute('data-started') || row.dataset.started || row.children[1]?.textContent;
                 const ms = parseTs(ds);
                 if (!isNaN(ms)) {
@@ -307,9 +308,9 @@
                     tick();
                 }
             }
-            initFromDom(); // ← сразу подхватываем
+            initFromDom();
 
-            function ensureActiveRow(userName, started_at){
+            function ensureActiveRow(userName, started_at, rowId = null){
                 // если уже есть серверная строка — используем её
                 if (!activeRow) {
                     const existed = document.querySelector('#timersBody tr.running-row');
@@ -322,43 +323,59 @@
                 } else {
                     activeRow.classList.add('running-row');
                 }
-                // Записываем ИМЕННО data-started
-                activeRow.setAttribute('data-started', started_at);
+
+                // если уже знаем id (например, бэк его отдаёт на старте) — проставим
+                if (rowId) activeRow.dataset.id = rowId;
+
+                const startedAttr = fmtTs(started_at);
+                activeRow.setAttribute('data-started', startedAttr);
+                activeRow.removeAttribute('data-stopped');
+
                 activeRow.innerHTML = `
 <td class="py-2 pr-4">${userName || activeRow.children[0]?.textContent || ''}</td>
-<td class="py-2 pr-4">${fmtTs(started_at)}</td>
+<td class="py-2 pr-4">${startedAttr}</td>
 <td class="py-2 pr-4">—</td>
 <td class="py-2">идёт...</td>
 <td class="py-2 timer-actions"><span class="text-slate-400">—</span></td>`;
             }
 
-            function finalizeActiveRow(stopped_at, id = null){
-                if (!activeStartMs) {
-                    // попробуем восстановиться из DOM
-                    const row = document.querySelector('#timersBody tr.running-row');
-                    if (row) {
-                        activeRow = row;
-                        const ds = row.getAttribute('data-started') || row.dataset.started || row.children[1]?.textContent;
-                        const ms = parseTs(ds);
-                        if (!isNaN(ms)) activeStartMs = ms;
-                    }
+            function finalizeActiveRow(payload){
+                const { started_at, stopped_at, id = null } = payload || {};
+
+                if (!activeRow) activeRow = document.querySelector('#timersBody tr.running-row');
+                if (!activeRow) {
+                    activeRow = document.createElement('tr');
+                    activeRow.className = 'border-t';
+                    timersBody.prepend(activeRow);
                 }
-                if (!activeRow || !activeStartMs) return; // нечего финализировать
 
-                const dur = Math.max(0, Math.floor((parseTs(stopped_at) - activeStartMs)/1000));
+                const startedAttr = fmtTs(started_at);
+                const stoppedAttr = fmtTs(stopped_at);
+                const dur = Math.max(0, Math.floor((parseTs(stoppedAttr) - parseTs(startedAttr))/1000));
+
                 activeRow.classList.remove('running-row');
-                activeRow.children[2].textContent = fmtTs(stopped_at);
-                activeRow.children[3].textContent = fmtHMS(dur);
-                activeRow.children[4].innerHTML = `<button type="button" class="px-2 py-1 border rounded timer-del">Удалить</button>`;
-                if (id) activeRow.dataset.id = id;
-                baseTotal += dur;
+                activeRow.setAttribute('data-started', startedAttr);
+                activeRow.setAttribute('data-stopped', stoppedAttr);
 
+                // ← КЛЮЧЕВОЕ: ставим id из payload ИЛИ оставляем существующий из DOM
+                const finalId = id ?? activeRow?.dataset?.id ?? getRunningRowId();
+                if (finalId) activeRow.dataset.id = finalId;
+
+                const userName = activeRow.children[0]?.textContent || @json(auth()->user()->name);
+                activeRow.innerHTML = `
+<td class="py-2 pr-4">${userName}</td>
+<td class="py-2 pr-4">${startedAttr}</td>
+<td class="py-2 pr-4">${stoppedAttr}</td>
+<td class="py-2">${fmtHMS(dur)}</td>
+<td class="py-2 timer-actions"><button type="button" class="px-2 py-1 border rounded timer-del">Удалить</button></td>`;
+
+                baseTotal += dur;
                 activeRow = null;
                 activeStartMs = null;
                 tick();
             }
 
-            // --- синхронизация с сервером (на всякий случай) ---
+            // --- синхронизация с сервером ---
             async function syncActive(){
                 try{
                     const r = await fetch(activeUrl, {headers:{'Accept':'application/json'}, credentials:'same-origin'});
@@ -372,16 +389,16 @@
                             const name = document.querySelector('#timersBody tr.running-row td:first-child')?.textContent
                                 || data?.user?.name
                                 || @json(auth()->user()->name);
-                            ensureActiveRow(name, data.started_at);
+                            // если сервер вдруг вернёт id — проставим
+                            const rowId = data?.id || data?.timer?.id || null;
+                            ensureActiveRow(name, data.started_at, rowId);
                         }
                     } else {
-                        // если ответ не про эту задачу, но в DOM есть running — оставляем локальное состояние
                         if (!activeStartMs) initFromDom();
                     }
                     tick();
                 }catch(e){ console.warn(e); }
             }
-            // сразу и периодически
             syncActive();
             setInterval(syncActive, 5000);
             document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) syncActive(); });
@@ -488,11 +505,12 @@
                     let data = {}; try{ data = await r.json(); }catch(e){}
                     const started = data?.timer?.started_at || data?.started_at || new Date().toISOString();
                     const user    = data?.timer?.user?.name || timersUserName;
+                    const timerId = data?.timer?.id || data?.id || null; // если бэк отдаёт id на старте — используем
 
                     const ms = parseTs(started);
                     if (!isNaN(ms)) {
                         activeStartMs = ms;
-                        ensureActiveRow(user, started);
+                        ensureActiveRow(user, started, timerId);
                         tick();
                     }
                     toast('Таймер запущен');
@@ -501,6 +519,7 @@
                         detail: {
                             task_id: @json($task->id),
                             started_at: started,
+                            id: timerId || null,
                             title: document.querySelector('input[name="title"]')?.value || 'Таймер'
                         }
                     }));
@@ -509,20 +528,55 @@
 
             async function stopNow(){
                 try{
-                    const r = await fetch(stopUrl, { method:'POST', headers:{'X-CSRF-TOKEN':csrf,'Accept':'application/json'}, credentials:'same-origin' });
-                    if (!r.ok) { toast('Не удалось остановить'); return; }
-                    let data = {}; try{ data = await r.json(); }catch(e){}
-                    const stopped = data?.timer?.stopped_at || data?.stopped_at || new Date().toISOString();
-                    const id      = data?.timer?.id || null;
+                    // если локально не видим активного таймера — не ходим в сеть
+                    const hasRunningDom = !!document.querySelector('#timersBody tr.running-row');
+                    if (!activeStartMs && !hasRunningDom) {
+                        toast('Таймер не запущен');
+                        return;
+                    }
 
-                    finalizeActiveRow(stopped, id);
+                    const r = await fetch(stopUrl, {
+                        method:'POST',
+                        headers:{'X-CSRF-TOKEN':csrf,'Accept':'application/json'},
+                        credentials:'same-origin'
+                    });
+
+                    // сервер может вернуть 204 — это тоже норма
+                    if (r.status === 204) {
+                        toast('Таймер не был запущен');
+                        return;
+                    }
+                    if (!r.ok) { toast('Не удалось остановить'); return; }
+
+                    let data = {}; try{ data = await r.json(); }catch(e){}
+
+                    // если бэк вернул "noop" — просто сообщаем и выходим
+                    if (data?.status === 'noop') {
+                        toast('Таймер не был запущен');
+                        return;
+                    }
+
+                    const t = (data && data.timer) ? data.timer : (data || {});
+                    const idCandidate = t.id ?? data?.id ?? t.timer_id ?? getRunningRowId() ?? null;
+
+                    const payload = {
+                        started_at: t.started_at
+                            || getRunningRow()?.getAttribute('data-started')
+                            || new Date(activeStartMs || Date.now()).toISOString(),
+                        stopped_at: t.stopped_at || new Date().toISOString(),
+                        id: idCandidate
+                    };
+
+                    finalizeActiveRow(payload);
                     toast('Таймер остановлен');
 
                     window.dispatchEvent(new CustomEvent('timer:stopped', {
-                        detail: { origin:'page', timer: { task_id: @json($task->id), stopped_at: stopped, id, user:{name: timersUserName} } }
+                        detail: { origin:'page', timer: { task_id: @json($task->id), ...payload, user:{name: timersUserName} } }
                     }));
+
                 }catch(e){ console.error(e); toast('Ошибка сети'); }
             }
+
             document.getElementById('btnTimerStop').addEventListener('click', stopNow);
 
             // события от плавающей плашки
@@ -533,25 +587,23 @@
                 const ms = parseTs(started);
                 if (!isNaN(ms)) {
                     activeStartMs = ms;
-                    ensureActiveRow(@json(auth()->user()->name), started);
+                    ensureActiveRow(@json(auth()->user()->name), started, d.id || null); // пробрасываем id из события, если был
                     tick();
                 }
             });
 
             window.addEventListener('timer:stopped', (e)=>{
-                if (e?.detail?.origin === 'page') return; // игнорим свой стоп
+                if (e?.detail?.origin === 'page') return;
                 const t = (e.detail && (e.detail.timer || e.detail)) || {};
                 if (Number(t.task_id) !== Number(@json($task->id))) return;
 
-                // подхватим старт из DOM, если утерян
-                if (!activeStartMs) {
-                    const row = document.querySelector('#timersBody tr.running-row');
-                    const ds  = row?.getAttribute('data-started') || row?.dataset?.started || row?.children[1]?.textContent;
-                    const ms  = parseTs(ds);
-                    if (!isNaN(ms)) activeStartMs = ms;
-                }
-                const stopped = t.stopped_at || new Date().toISOString();
-                finalizeActiveRow(stopped, t.id || null);
+                const started = t.started_at
+                    || document.querySelector('#timersBody tr.running-row')?.getAttribute('data-started')
+                    || fmtTs(new Date(activeStartMs || Date.now()).toISOString());
+                const stopped = t.stopped_at || fmtTs(new Date().toISOString());
+                const id      = t.id ?? getRunningRowId() ?? null; // ← резерв из DOM
+
+                finalizeActiveRow({ started_at: started, stopped_at: stopped, id });
             });
 
             // ручное добавление интервала
@@ -563,7 +615,7 @@
                 let data = {}; try{ data = await r.json(); }catch(e){}
                 const start = data?.timer?.started_at || fd.get('started_at');
                 const stop  = data?.timer?.stopped_at || fd.get('stopped_at');
-                const id    = data?.timer?.id || null;
+                const id    = data?.timer?.id || data?.id || null;
                 const dur   = Math.max(0, Math.floor((parseTs(stop) - parseTs(start))/1000));
                 const tr = document.createElement('tr');
                 tr.className = 'border-t';
@@ -618,5 +670,6 @@
 
         })();
     </script>
+
 
 @endsection
