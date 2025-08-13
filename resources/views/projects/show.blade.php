@@ -484,16 +484,42 @@
                 },
 
                 async removeUploaded(idx, id){
-                    if(!id){ this.uploaded.splice(idx,1); return; }
+                    if (!id) { this.uploaded.splice(idx, 1); return; }
+
+                    // URL с правильным именем параметра {attachment}
+                    const url = @json(route('task-files.destroyDraft', ':attachment')).replace(':attachment', id);
+
                     try{
-                        const res = await fetch('{{ url('/task-files') }}/'+id, {
-                            method:'DELETE',
-                            headers: {'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'},
-                            credentials:'same-origin'
+                        const fd = new FormData();
+                        fd.append('_method', 'DELETE'); // метод-спуфинг для Laravel
+
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: fd,
+                            credentials: 'same-origin'
                         });
-                        if(res.ok) this.uploaded.splice(idx,1);
-                    }catch(e){ console.error(e); }
+
+                        if (!res.ok) {
+                            const txt = await res.text().catch(()=>'');
+                            console.error('delete failed', res.status, txt);
+                            window.toast?.(res.status === 403 ? 'Нет прав на удаление файла' : 'Не удалось удалить файл');
+                            return;
+                        }
+
+                        this.uploaded.splice(idx, 1);
+                        window.toast?.('Файл удалён');
+                    }catch(e){
+                        console.error(e);
+                        window.toast?.('Ошибка сети');
+                    }
                 },
+
+
 
                 humanSize(bytes){
                     if(!bytes && bytes !== 0) return '';
@@ -524,7 +550,6 @@
                         });
                         let data = {};
                         try { data = await res.json(); } catch(e) {}
-
                         if(!res.ok){
                             throw new Error(data?.message || 'Ошибка сохранения');
                         }

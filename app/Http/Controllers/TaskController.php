@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 class TaskController extends Controller
 {
     /** Создание задачи (используется модалка на доске) */
+    /** Создание задачи (используется модалка на доске) */
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -49,25 +50,25 @@ class TaskController extends Controller
         $task = DB::transaction(function () use ($data, $request) {
             $task = Task::create($data);
 
-            // Привязываем загруженные файлы по draft_token к созданной задаче
+            // привязываем загруженные файлы по draft_token к созданной задаче
             if ($request->filled('draft_token')) {
                 TaskFile::where('draft_token', $request->string('draft_token'))
                     ->update(['task_id' => $task->id, 'draft_token' => null]);
             }
 
-            return $task->fresh(['assignee','files']);
+            return $task;
         });
 
-        // Готовим HTML карточки (чтобы сразу вставить в колонку без перезагрузки)
-        $html = sprintf(
-            '<a href="%s" class="block bg-white border rounded-xl hover:shadow-soft transition p-3 kanban-card" data-id="%d">
-                <div class="font-medium">%s</div>
-                <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-600"></div>
-            </a>',
-            route('tasks.show', $task),
-            $task->id,
-            e($task->title)
-        );
+        // подгружаем то, что нужно карточке
+        $task->loadMissing(['assignee']);
+        // если в модели нет кастов, убедимся что due_at — Carbon (на всякий случай)
+        if ($task->due_at && !($task->due_at instanceof Carbon)) {
+            $task->due_at = Carbon::parse($task->due_at);
+        }
+
+        // Рендерим ту же карточку, что используется на доске
+        // resources/views/kanban/_card.blade.php
+        $html = view('kanban._card', ['task' => $task])->render();
 
         return response()->json([
             'message' => 'ok',
@@ -75,6 +76,7 @@ class TaskController extends Controller
             'html'    => $html,
         ]);
     }
+
 
     /** Перетаскивание между колонками / переупорядочивание */
     public function move(Request $request)

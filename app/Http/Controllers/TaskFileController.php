@@ -98,12 +98,44 @@ class TaskFileController extends Controller
     public function destroy(TaskFile $file)
     {
         // Разрешим удалять владельцу файла; при желании — добавь политику/проверку прав
+
         if ($file->user_id !== auth()->id()) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
         Storage::disk('public')->delete($file->path);
         $file->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function destroyDraft(Request $request, TaskFile $attachment)
+    {
+        // Разрешаем только черновые файлы
+        if ($attachment->task_id) {
+            return response()->json(['message' => 'Not a draft'], 409);
+        }
+
+        $userId    = (int) auth()->id();
+        $isOwner   = (int) $attachment->user_id === $userId;
+
+        // Авторизация по драфт-токену (берём из заголовка или из тела запроса)
+        $tokenHeader = (string) $request->header('X-Draft-Token', '');
+        $tokenInput  = (string) $request->input('draft_token', '');
+        $token       = $tokenHeader !== '' ? $tokenHeader : $tokenInput;
+
+        $hasDraftMatch = $attachment->draft_token
+            && $token !== ''
+            && hash_equals($attachment->draft_token, $token);
+
+        if (!($isOwner || $hasDraftMatch)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if (!empty($attachment->path)) {
+            Storage::disk('public')->delete($attachment->path);
+        }
+        $attachment->delete();
 
         return response()->json(['ok' => true]);
     }

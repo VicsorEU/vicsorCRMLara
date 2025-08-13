@@ -400,11 +400,13 @@
                 const li = cb.closest('.step-item');
                 if (li) li.classList.toggle('bg-green-50', cb.checked);
                 saveStepsAjax(true);
+                window.toast?.('Этап сменил статус');
             });
 
             stepsList?.addEventListener('input', (e)=>{
                 if (!e.target.classList?.contains('step-text')) return;
                 debouncedSaveSteps();
+                window.toast?.('Этап сохранен');
             });
 
             stepsList?.addEventListener('blur', (e)=>{
@@ -425,6 +427,7 @@
                 if (!rm) return;
                 rm.closest('.step-item')?.remove();
                 saveStepsAjax(true);
+                window.toast?.('Этап сохранен1');
             });
 
             // ---------- резервы для id активной строки (таймеры) ----------

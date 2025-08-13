@@ -16,6 +16,8 @@ use App\Http\Controllers\{
     ProjectController, ColumnController, KanbanController, TaskController,
     TimerController, TaskFileController, TaskCommentController
 };
+use App\Http\Controllers\SettingsController;
+
 
 Route::middleware('guest')->group(function () {
     Route::get('/login',  [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -83,6 +85,14 @@ Route::middleware('auth')->group(function () {
     // Если используете отдельные эндпоинты для загрузчика файлов:
     Route::post('/task-files/upload',                    [TaskFileController::class, 'upload'])->name('task-files.upload');
     Route::delete('/task-files/{attachment}',            [TaskFileController::class, 'destroy'])->whereNumber('attachment')->name('task-files.destroy');
+    Route::delete('/task-files/{attachment}',            [TaskFileController::class, 'destroyDraft'])->whereNumber('attachment')->name('task-files.destroyDraft');
+
     Route::delete('/timers/{timer}', [TimerController::class, 'destroy'])
         ->name('timers.destroy');
+
+    Route::middleware('auth')->group(function () {
+        Route::get('/settings/{section?}', [SettingsController::class, 'index'])
+            ->where('section', 'general|projects')
+            ->name('settings.index');
+    });
 });
