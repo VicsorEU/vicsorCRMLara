@@ -95,4 +95,12 @@ Route::middleware('auth')->group(function () {
             ->where('section', 'general|projects')
             ->name('settings.index');
     });
+
+    Route::post('/settings/general', [SettingsController::class, 'saveGeneral'])
+        ->name('settings.general.save');
+    Route::post('/settings/logo', [SettingsController::class, 'uploadLogo'])
+        ->name('settings.logo.upload');
+
+    Route::delete('/settings/logo', [SettingsController::class, 'deleteLogo'])
+        ->name('settings.logo.delete');
 });
