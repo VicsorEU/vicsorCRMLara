@@ -38,16 +38,6 @@
         </div>
 
         <div>
-            <label class="block text-sm mb-1">Компания (опционально)</label>
-            <input type="text" name="company" value="{{ old('company') }}"
-                   class="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-brand-500"
-                   placeholder="ООО «Пример»">
-            @error('company')
-            <div class="mt-1 text-xs text-red-300">{{ $message }}</div>
-            @enderror
-        </div>
-
-        <div>
             <label class="block text-sm mb-1">Пароль</label>
             <input type="password" name="password" autocomplete="new-password"
                    class="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 outline-none focus:ring-2 focus:ring-brand-500"
