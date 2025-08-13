@@ -66,7 +66,7 @@
                 </div>
 
                 <div class="md:col-span-3">
-                    <label class="block textсм mb-1">Описание</label>
+                    <label class="block text-sm mb-1">Описание</label>
                     <textarea name="details" rows="4" class="w-full border rounded-lg px-3 py-2">{{ old('details',$task->details) }}</textarea>
                 </div>
 
@@ -127,13 +127,13 @@
             <div class="bg-white border rounded-2xl shadow-soft">
                 <div class="px-5 py-3 border-b font-medium">Комментарии</div>
                 <div class="p-5">
-                    <form class="flex gap-2 mb-3" method="post" action="{{ route('tasks.comments.store',$task) }}">
+                    <form id="commentForm" class="flex gap-2 mb-3" method="post" action="{{ route('tasks.comments.store',$task) }}">
                         @csrf
                         <input name="body" class="flex-1 border rounded-lg px-3 py-2" placeholder="Написать комментарий..." required>
                         <button type="submit" class="px-3 py-2 rounded-lg border">Отправить</button>
                     </form>
 
-                    <div class="space-y-3">
+                    <div id="commentsList" class="space-y-3">
                         @forelse($task->comments as $c)
                             <div>
                                 <div class="text-xs text-slate-500">
@@ -143,11 +143,12 @@
                                 <div>{{ $c->body }}</div>
                             </div>
                         @empty
-                            <div class="text-slate-500">Пока нет комментариев</div>
+                            <div class="text-slate-500 empty-comments">Пока нет комментариев</div>
                         @endforelse
                     </div>
                 </div>
             </div>
+
         </div>
 
         {{-- Этапы --}}
@@ -171,7 +172,7 @@
 
         {{-- Учёт времени --}}
         <div class="bg-white border rounded-2xl shadow-soft">
-            <div class="px-5 py-3 border-b font-medium">Учёт времени</div>
+            <div class="px-5 py-3 border-б font-medium">Учёт времени</div>
             <div class="p-5 overflow-x-auto">
                 <table class="min-w-full text-sm">
                     <thead class="text-left text-slate-500">
@@ -186,13 +187,18 @@
                     <tbody id="timersBody">
                     @foreach($task->timers as $t)
                         @php $d = (int)($t->duration_sec ?? 0); @endphp
+                        @php $tz = 'Europe/Kyiv'; @endphp
                         <tr class="border-t {{ $t->stopped_at ? '' : 'running-row' }}"
                             data-id="{{ $t->id }}"
                             data-started="{{ optional($t->started_at)->toIso8601String() }}"
                             data-stopped="{{ optional($t->stopped_at)->toIso8601String() }}">
                             <td class="py-2 pr-4">{{ $t->user->name ?? ('Пользователь #'.$t->user_id) }}</td>
-                            <td class="py-2 pr-4">{{ $t->started_at }}</td>
-                            <td class="py-2 pr-4">{{ $t->stopped_at ?? '—' }}</td>
+                            <td class="py-2 pr-4">
+                                {{ $t->started_at ? $t->started_at->copy()->timezone($tz)->format('Y-m-d H:i:s') : '—' }}
+                            </td>
+                            <td class="py-2 pr-4">
+                                {{ $t->stopped_at ? $t->stopped_at->copy()->timezone($tz)->format('Y-m-d H:i:s') : '—' }}
+                            </td>
                             <td class="py-2">{{ $d ? sprintf('%02d:%02d:%02d', intdiv($d,3600), intdiv($d%3600,60), $d%60) : 'идёт...' }}</td>
                             <td class="py-2 timer-actions">
                                 @if($t->stopped_at)
@@ -210,6 +216,7 @@
                 <form id="manualTimerForm" class="mt-4 flex flex-wrap items-end gap-2" method="post" action="{{ route('kanban.timer.stop',$task) }}">
                     @csrf
                     <input type="hidden" name="manual" value="1">
+                    <input type="hidden" name="tz_offset" id="tzOffset" value="">
                     <div>
                         <label class="block text-sm mb-1">Начало</label>
                         <input id="manualStart" type="datetime-local" name="started_at" class="border rounded-lg px-3 py-2" required>
@@ -223,7 +230,7 @@
             </div>
         </div>
     </div>
-
+    @include('shared.toast')
     {{-- ===== JS ===== --}}
     <script>
         (function(){
@@ -239,6 +246,10 @@
 
             const toast = (m)=> window.toast ? window.toast(m) : console.log(m);
 
+            // выставим смещение таймзоны (UTC - local) в скрытое поле
+            const tzHidden = document.getElementById('tzOffset');
+            if (tzHidden) tzHidden.value = String(new Date().getTimezoneOffset());
+
             // ---------- helpers ----------
             const fmtHMS = s => {
                 s = Math.max(0, s|0);
@@ -247,7 +258,7 @@
                 const ss= String(s%60).padStart(2,'0');
                 return `${h}:${m}:${ss}`;
             };
-            // режем микросекунды, НЕ добавляем «Z», если её нет
+            // без навешивания 'Z'
             const parseTs = (v) => {
                 if (!v) return NaN;
                 let s = String(v).trim().replace(' ', 'T');
@@ -266,10 +277,85 @@
                 const s = String(d.getSeconds()).padStart(2,'0');
                 return `${y}-${M}-${D} ${h}:${m}:${s}`;
             };
+            const toIso = (v) => {
+                const ms = parseTs(v);
+                return isNaN(ms) ? '' : new Date(ms).toISOString();
+            };
             const durFromText = (txt) => {
                 const [h='0', m='0', s='0'] = String(txt).split(':');
                 return (+h)*3600 + (+m)*60 + (+s);
             };
+
+            /* ======== КОММЕНТАРИИ (AJAX) ======== */
+            const commentForm  = document.getElementById('commentForm');
+            const commentsList = document.getElementById('commentsList');
+
+            const escHtml = (s) => String(s)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+            const fmtLocal = (v) => {
+                const ms = parseTs(v);
+                const d  = isNaN(ms) ? new Date() : new Date(ms);
+                const dd = String(d.getDate()).padStart(2,'0');
+                const MM = String(d.getMonth()+1).padStart(2,'0');
+                const YY = d.getFullYear();
+                const hh = String(d.getHours()).padStart(2,'0');
+                const mm = String(d.getMinutes()).padStart(2,'0');
+                return `${dd}.${MM}.${YY} ${hh}:${mm}`;
+            };
+
+            commentForm?.addEventListener('submit', async (e)=>{
+                e.preventDefault();
+                const input = commentForm.querySelector('input[name="body"]');
+                const body  = (input?.value || '').trim();
+                if (!body) return;
+
+                const fd = new FormData(commentForm);
+                const btn = commentForm.querySelector('button[type="submit"]');
+                btn?.setAttribute('disabled','disabled');
+
+                try{
+                    const r = await fetch(commentForm.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrf,
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: fd,
+                        credentials: 'same-origin'
+                    });
+
+                    let data = {};
+                    try { data = await r.json(); } catch(_) {}
+                    if (!r.ok) throw new Error('HTTP '+r.status);
+
+                    const c = data?.comment || data || {};
+                    const createdAt = c.created_at || new Date().toISOString();
+                    const userName  = c?.user?.name || @json(auth()->user()->name);
+                    const text      = c.body || body;
+
+                    commentsList?.querySelector('.empty-comments')?.remove();
+
+                    const wrap = document.createElement('div');
+                    wrap.innerHTML = `
+<div>
+  <div class="text-xs text-slate-500">${fmtLocal(createdAt)} — ${escHtml(userName)}</div>
+  <div>${escHtml(text)}</div>
+</div>`;
+                    commentsList?.appendChild(wrap.firstElementChild);
+
+                    input.value = '';
+                    toast('Комментарий добавлен');
+                }catch(err){
+                    console.error(err);
+                    toast('Не удалось отправить комментарий');
+                }finally{
+                    btn?.removeAttribute('disabled');
+                }
+            });
+            /* ======== /КОММЕНТАРИИ (AJAX) ======== */
 
             // ---------- Этапы ----------
             const stepsList = document.getElementById('stepsList');
@@ -301,7 +387,6 @@
             };
             const debouncedSaveSteps = debounce(()=>saveStepsAjax(true), 400);
 
-            // + Добавить этап
             stepAddBtn?.addEventListener('click', () => {
                 if (!stepsList) return;
                 const li = document.createElement('li');
@@ -312,11 +397,9 @@
             <button type="button" class="px-2 py-1 text-slate-500 hover:text-red-600 step-remove">✕</button>`;
                 stepsList.appendChild(li);
                 li.querySelector('.step-text').focus();
-                // сразу фиксируем добавление (пустые шаги не попадут из-за фильтра)
                 saveStepsAjax(true);
             });
 
-            // Делегирование: чекбокс — подсветка и сохранение
             stepsList?.addEventListener('change', (e)=>{
                 const cb = e.target.closest('.step-done');
                 if (!cb) return;
@@ -325,19 +408,16 @@
                 saveStepsAjax(true);
             });
 
-            // Делегирование: ввод текста — дебаунс-сохранение
             stepsList?.addEventListener('input', (e)=>{
                 if (!e.target.classList?.contains('step-text')) return;
                 debouncedSaveSteps();
             });
 
-            // Делегирование: уход с поля — мгновенное сохранение
             stepsList?.addEventListener('blur', (e)=>{
                 if (!e.target.classList?.contains('step-text')) return;
                 saveStepsAjax(true);
             }, true);
 
-            // Делегирование: Enter в поле шага — не отправляем форму, сохраняем
             stepsList?.addEventListener('keydown', (e)=>{
                 if (!e.target.classList?.contains('step-text')) return;
                 if (e.key === 'Enter') {
@@ -346,7 +426,6 @@
                 }
             });
 
-            // Делегирование: удалить шаг
             stepsList?.addEventListener('click', (e)=>{
                 const rm = e.target.closest('.step-remove');
                 if (!rm) return;
@@ -405,13 +484,15 @@
                 }
                 if (rowId) activeRow.dataset.id = rowId;
 
-                const startedAttr = fmtTs(started_at);
-                activeRow.setAttribute('data-started', startedAttr);
+                const startedIso  = toIso(started_at);
+                const startedText = fmtTs(started_at);
+
+                activeRow.setAttribute('data-started', startedIso || startedText);
                 activeRow.removeAttribute('data-stopped');
 
                 activeRow.innerHTML = `
 <td class="py-2 pr-4">${userName || activeRow.children[0]?.textContent || ''}</td>
-<td class="py-2 pr-4">${startedAttr}</td>
+<td class="py-2 pr-4">${startedText}</td>
 <td class="py-2 pr-4">—</td>
 <td class="py-2">идёт...</td>
 <td class="py-2 timer-actions"><span class="text-slate-400">—</span></td>`;
@@ -427,13 +508,15 @@
                     timersBody.prepend(activeRow);
                 }
 
-                const startedAttr = fmtTs(started_at);
-                const stoppedAttr = fmtTs(stopped_at);
-                const dur = Math.max(0, Math.floor((parseTs(stoppedAttr) - parseTs(startedAttr))/1000));
+                const startedIso  = toIso(started_at);
+                const stoppedIso  = toIso(stopped_at);
+                const startedText = fmtTs(started_at);
+                const stoppedText = fmtTs(stopped_at);
+                const dur = Math.max(0, Math.floor((parseTs(stoppedIso) - parseTs(startedIso))/1000));
 
                 activeRow.classList.remove('running-row');
-                activeRow.setAttribute('data-started', startedAttr);
-                activeRow.setAttribute('data-stopped', stoppedAttr);
+                if (startedIso) activeRow.setAttribute('data-started', startedIso);
+                if (stoppedIso) activeRow.setAttribute('data-stopped', stoppedIso);
 
                 const finalId = id ?? activeRow?.dataset?.id ?? getRunningRowId();
                 if (finalId) activeRow.dataset.id = finalId;
@@ -441,8 +524,8 @@
                 const userName = activeRow.children[0]?.textContent || @json(auth()->user()->name);
                 activeRow.innerHTML = `
 <td class="py-2 pr-4">${userName}</td>
-<td class="py-2 pr-4">${startedAttr}</td>
-<td class="py-2 pr-4">${stoppedAttr}</td>
+<td class="py-2 pr-4">${startedText}</td>
+<td class="py-2 pr-4">${stoppedText}</td>
 <td class="py-2">${fmtHMS(dur)}</td>
 <td class="py-2 timer-actions"><button type="button" class="px-2 py-1 border rounded timer-del">Удалить</button></td>`;
 
@@ -458,16 +541,16 @@
                     const r = await fetch(activeUrl, {headers:{'Accept':'application/json'}, credentials:'same-origin'});
                     if (!r.ok) return;
                     const data = await r.json();
+                    const t = data?.timer;
 
-                    if (Number(data?.task_id) === Number(@json($task->id)) && data?.started_at) {
-                        const ms = parseTs(data.started_at);
+                    if (t && Number(t.task_id) === Number(@json($task->id)) && t.started_at) {
+                        const ms = parseTs(t.started_at);
                         if (!isNaN(ms)) {
                             activeStartMs = ms;
                             const name = document.querySelector('#timersBody tr.running-row td:first-child')?.textContent
-                                || data?.user?.name
+                                || t?.user?.name
                                 || @json(auth()->user()->name);
-                            const rowId = data?.id || data?.timer?.id || null;
-                            ensureActiveRow(name, data.started_at, rowId);
+                            ensureActiveRow(name, t.started_at, t.id || null);
                         }
                     } else {
                         if (!activeStartMs) initFromDom();
@@ -493,7 +576,11 @@
                     headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},
                     body: fd, credentials:'same-origin'
                 });
-                toast(r.ok ? 'Сохранено' : 'Ошибка сохранения');
+                (typeof window.toast === 'function'
+                        ? window.toast
+                        : (m) => console.log(m)
+                )(r.ok ? 'Сохранено' : 'Ошибка сохранения');
+
             });
 
             // ---------- удалить задачу ----------
@@ -662,8 +749,8 @@
 
                 const started = t.started_at
                     || document.querySelector('#timersBody tr.running-row')?.getAttribute('data-started')
-                    || fmtTs(new Date(activeStartMs || Date.now()).toISOString());
-                const stopped = t.stopped_at || fmtTs(new Date().toISOString());
+                    || new Date(activeStartMs || Date.now()).toISOString();
+                const stopped = t.stopped_at || new Date().toISOString();
                 const id      = t.id ?? getRunningRowId() ?? null;
 
                 finalizeActiveRow({ started_at: started, stopped_at: stopped, id });
@@ -672,28 +759,71 @@
             // ручное добавление интервала
             document.getElementById('manualTimerForm').addEventListener('submit', async (e)=>{
                 e.preventDefault();
+
+                const startVal = document.getElementById('manualStart')?.value;
+                const stopVal  = document.getElementById('manualStop')?.value;
+
+                const startIso = startVal ? new Date(startVal).toISOString() : '';
+                const stopIso  = stopVal  ? new Date(stopVal).toISOString()  : '';
+
                 const fd = new FormData(e.currentTarget);
-                const r = await fetch(stopUrl, { method:'POST', headers:{'X-CSRF-TOKEN':csrf,'Accept':'application/json'}, body:fd, credentials:'same-origin' });
-                if (!r.ok) return toast('Не удалось добавить');
-                let data = {}; try{ data = await r.json(); }catch(e){}
-                const start = data?.timer?.started_at || fd.get('started_at');
-                const stop  = data?.timer?.stopped_at || fd.get('stopped_at');
-                const id    = data?.timer?.id || data?.id || null;
-                const dur   = Math.max(0, Math.floor((parseTs(stop) - parseTs(start))/1000));
-                const tr = document.createElement('tr');
-                tr.className = 'border-t';
-                if (id) tr.dataset.id = id;
-                tr.innerHTML = `
+                fd.set('started_at', startIso || startVal);
+                fd.set('stopped_at', stopIso  || stopVal);
+                fd.set('tz_offset', String(new Date().getTimezoneOffset()));
+
+                try{
+                    const r = await fetch(stopUrl, {
+                        method:'POST',
+                        headers:{
+                            'X-CSRF-TOKEN': csrf,
+                            'Accept':'application/json',
+                            'X-Requested-With':'XMLHttpRequest'
+                        },
+                        body: fd,
+                        credentials:'same-origin'
+                    });
+                    if (!r.ok) { toast('Не удалось добавить'); return; }
+
+                    let data = {};
+                    try { data = await r.json(); } catch(_) {}
+
+                    const T = (data && data.timer) ? data.timer : (data || {});
+                    let timerId = T.id ?? T.timer_id ?? data?.id ?? null;
+
+                    if (!timerId && data?.row) {
+                        const m = String(data.row).match(/data-id="(\d+)"/);
+                        if (m) timerId = m[1];
+                    }
+
+                    const startRaw = T.started_at ?? startIso ?? startVal;
+                    const stopRaw  = T.stopped_at  ?? stopIso  ?? stopVal;
+
+                    const durSec = Math.max(0, Math.floor((parseTs(stopRaw) - parseTs(startRaw))/1000));
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-t';
+                    if (timerId) tr.dataset.id = timerId;
+                    tr.setAttribute('data-started', toIso(startRaw) || startRaw);
+                    tr.setAttribute('data-stopped', toIso(stopRaw) || stopRaw);
+
+                    tr.innerHTML = `
 <td class="py-2 pr-4">{{ addslashes(auth()->user()->name) }}</td>
-<td class="py-2 pr-4">${fmtTs(start)}</td>
-<td class="py-2 pr-4">${fmtTs(stop)}</td>
-<td class="py-2">${fmtHMS(dur)}</td>
+<td class="py-2 pr-4">${fmtTs(startRaw)}</td>
+<td class="py-2 pr-4">${fmtTs(stopRaw)}</td>
+<td class="py-2">${fmtHMS(durSec)}</td>
 <td class="py-2 timer-actions"><button type="button" class="px-2 py-1 border rounded timer-del">Удалить</button></td>`;
-                timersBody.prepend(tr);
-                baseTotal += dur;
-                tick();
-                e.currentTarget.reset();
-                toast('Интервал добавлен');
+
+                    document.getElementById('timersBody').prepend(tr);
+
+                    baseTotal += durSec;
+                    tick();
+
+                    e.currentTarget.reset();
+                    toast(timerId ? 'Интервал добавлен' : 'Интервал добавлен (id не вернулся)');
+                }catch(err){
+                    console.error(err);
+                    toast('Ошибка сети');
+                }
             });
 
             // ---------- Удаление таймера ----------

@@ -6,38 +6,102 @@ use App\Models\{Task, TaskTimer};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
+use Carbon\Carbon;
 
 class TimerController extends Controller
 {
-    public function start(Task $task)
+    public function start(Request $r, Task $task)
     {
         $t = $task->timers()->create([
-            'user_id'    => auth()->id(),
-            'started_at' => now(),
+            'user_id'    => Auth::id(),
+            'started_at' => now()->utc(), // всегда храним в UTC
         ]);
 
-        if (request()->wantsJson()) {
+        if ($r->wantsJson()) {
             $task->load('timers.user');
+
             return response()->json([
                 'ok'            => true,
-                'timer'         => $t,
-                'total_seconds' => $task->total_seconds,   // без «тика», тикаем на клиенте
+                'timer'         => [
+                    'id'           => $t->id,
+                    'task_id'      => $t->task_id,
+                    'user'         => ['id' => $t->user_id, 'name' => optional($t->user)->name],
+                    'started_at'   => optional($t->started_at)->toIso8601String(), // UTC ISO
+                    'stopped_at'   => optional($t->stopped_at)->toIso8601String(),  // UTC ISO
+                ],
+                'total_seconds' => $task->total_seconds,
             ]);
         }
+
         return back();
     }
 
     public function stop(Request $r, Task $task)
     {
+        // хелпер для парсинга "локального" времени в UTC
+        $parseLocalToUtc = function (?string $val, ?int $offsetMinutes, ?string $appTz) : ?Carbon {
+            if (!$val) return null;
+
+            // 1) Если пришёл ISO со смещением/суффиксом Z — просто парсим и в UTC
+            if (preg_match('/[zZ]|[+\-]\d{2}:?\d{2}$/', $val)) {
+                return Carbon::parse($val)->utc();
+            }
+
+            // 2) Если прислали offset (UTC - local), используем его.
+            //    В JS: getTimezoneOffset() возвращает именно (UTC - local) в минутах.
+            //    Значит UTC = local + offset.
+            $fmt = (strlen($val) === 16) ? 'Y-m-d\TH:i' : 'Y-m-d\TH:i:s'; // с секундами или без
+            if ($offsetMinutes !== null) {
+                // трактуем строку как "наивную" в UTC и смещаем на offset
+                $dt = Carbon::createFromFormat($fmt, $val, 'UTC');
+                if ($dt === false) { // на всякий случай fallback
+                    $dt = Carbon::parse($val, 'UTC');
+                }
+                return $dt->addMinutes($offsetMinutes)->utc();
+            }
+
+            // 3) Иначе считаем, что это локальное время приложения (app.timezone)
+            $tz = $appTz ?: config('app.timezone') ?: 'UTC';
+            $dt = Carbon::createFromFormat($fmt, $val, $tz);
+            if ($dt === false) { // fallback
+                $dt = Carbon::parse($val, $tz);
+            }
+            return $dt->utc();
+        };
+
         if ($r->boolean('manual')) {
+            $offset = $r->has('tz_offset') ? (int)$r->input('tz_offset') : null;
+            $appTz  = config('app.timezone') ?: 'UTC';
+
+            $startUtc = $parseLocalToUtc($r->input('started_at'), $offset, $appTz);
+            $stopUtc  = $parseLocalToUtc($r->input('stopped_at'),  $offset, $appTz);
+
+            if (!$startUtc || !$stopUtc || $stopUtc->lt($startUtc)) {
+                return $r->wantsJson()
+                    ? response()->json(['ok' => false, 'error' => 'Invalid interval'], 422)
+                    : back();
+            }
+
             $t = $task->timers()->create([
-                'user_id'    => auth()->id(),
-                'started_at' => $r->date('started_at'),
-                'stopped_at' => $r->date('stopped_at'),
+                'user_id'    => Auth::id(),
+                'started_at' => $startUtc,
+                'stopped_at' => $stopUtc,
             ]);
         } else {
-            $t = $task->timers()->whereNull('stopped_at')->latest('id')->firstOrFail();
-            $t->update(['stopped_at' => now()]);
+            // мягкая остановка без 404, если активного нет
+            $t = $task->timers()
+                ->where('user_id', Auth::id())
+                ->whereNull('stopped_at')
+                ->latest('id')
+                ->first();
+
+            if (!$t) {
+                return $r->wantsJson()
+                    ? response()->json(['ok' => true, 'status' => 'noop'])
+                    : back();
+            }
+
+            $t->update(['stopped_at' => now()->utc()]);
         }
 
         $task->load('timers.user');
@@ -45,54 +109,56 @@ class TimerController extends Controller
         if ($r->wantsJson()) {
             return response()->json([
                 'ok'            => true,
+                // если используешь частичный Blade-ряд — оставлю для совместимости
                 'row'           => view('tasks._timer_row', ['t' => $t])->render(),
+                // обязательный блок с id и временами
+                'timer'         => [
+                    'id'           => $t->id,
+                    'task_id'      => $t->task_id,
+                    'user'         => ['id' => $t->user_id, 'name' => optional($t->user)->name],
+                    'started_at'   => optional($t->started_at)->toIso8601String(), // UTC ISO
+                    'stopped_at'   => optional($t->stopped_at)->toIso8601String(),  // UTC ISO
+                ],
                 'total_seconds' => $task->total_seconds,
             ]);
         }
+
         return back();
     }
 
-    public function active() // уже есть роут GET /timer/active
+    public function active(): JsonResponse
     {
-        $t = \App\Models\TaskTimer::with('task')
+        $t = TaskTimer::with(['task', 'user'])
             ->whereNull('stopped_at')
-            ->where('user_id', auth()->id())
-            ->latest('id')->first();
+            ->where('user_id', Auth::id())
+            ->latest('id')
+            ->first();
 
         return response()->json([
-            'timer'         => $t ? [
+            'timer' => $t ? [
                 'id'         => $t->id,
                 'task_id'    => $t->task_id,
                 'task_title' => $t->task->title ?? ('Задача #'.$t->task_id),
-                'started_at' => $t->started_at,
+                'started_at' => optional($t->started_at)->toIso8601String(), // UTC ISO
+                'user'       => ['id' => $t->user_id, 'name' => optional($t->user)->name],
             ] : null,
         ]);
     }
 
     public function destroy(TaskTimer $timer, Request $request): JsonResponse
     {
-        // (опционально) доступ только своему таймеру
-        // if ($timer->user_id !== auth()->id()) {
-        //     return response()->json(['message' => 'Forbidden'], 403);
-        // }
-
-        // Нельзя удалять «идущий» таймер
         if (is_null($timer->stopped_at)) {
             return response()->json(['message' => 'Сначала остановите таймер'], 422);
         }
 
-        // посчитаем длительность, чтобы на фронте вычесть её из общего времени
         $duration = 0;
         try {
-            if (method_exists($timer, 'getAttribute') && $timer->getAttribute('duration_sec') !== null) {
-                $duration = (int) $timer->duration_sec;
-            } elseif ($timer->started_at && $timer->stopped_at) {
-                $start = $timer->started_at instanceof \Carbon\Carbon ? $timer->started_at : \Carbon\Carbon::parse($timer->started_at);
-                $stop  = $timer->stopped_at instanceof \Carbon\Carbon ? $timer->stopped_at  : \Carbon\Carbon::parse($timer->stopped_at);
+            if ($timer->started_at && $timer->stopped_at) {
+                $start = $timer->started_at instanceof Carbon ? $timer->started_at : Carbon::parse($timer->started_at);
+                $stop  = $timer->stopped_at instanceof Carbon ? $timer->stopped_at  : Carbon::parse($timer->stopped_at);
                 $duration = max(0, $stop->diffInSeconds($start));
             }
         } catch (\Throwable $e) {
-            // не критично, просто не вернём duration
             $duration = 0;
         }
 
@@ -108,5 +174,4 @@ class TimerController extends Controller
             'duration_sec'  => $duration,
         ]);
     }
-
 }
