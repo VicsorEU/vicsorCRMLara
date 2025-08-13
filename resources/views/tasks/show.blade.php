@@ -2,6 +2,7 @@
 
 @section('title', 'Задача #'.$task->id)
 @section('page_title', 'Задача #'.$task->id)
+@php $tz = 'Europe/Kyiv'; @endphp
 
 @php
     $projectId = optional($task->board)->project_id
@@ -137,7 +138,8 @@
                         @forelse($task->comments as $c)
                             <div>
                                 <div class="text-xs text-slate-500">
-                                    {{ $c->created_at->format('d.m.Y H:i') }} —
+                                    {{ $c->created_at ? $c->created_at->copy()->timezone($tz)->format('Y-m-d H:i:s') : '—' }}
+
                                     {{ $c->user->name ?? ('Пользователь #'.$c->user_id) }}
                                 </div>
                                 <div>{{ $c->body }}</div>
@@ -187,7 +189,7 @@
                     <tbody id="timersBody">
                     @foreach($task->timers as $t)
                         @php $d = (int)($t->duration_sec ?? 0); @endphp
-                        @php $tz = 'Europe/Kyiv'; @endphp
+
                         <tr class="border-t {{ $t->stopped_at ? '' : 'running-row' }}"
                             data-id="{{ $t->id }}"
                             data-started="{{ optional($t->started_at)->toIso8601String() }}"
@@ -286,40 +288,30 @@
                 return (+h)*3600 + (+m)*60 + (+s);
             };
 
-            /* ======== КОММЕНТАРИИ (AJAX) ======== */
-            const commentForm  = document.getElementById('commentForm');
-            const commentsList = document.getElementById('commentsList');
+            // ===== Комментарии (AJAX, добавляем вверху) =====
+            const commentForm   = document.getElementById('commentForm');
+            const commentsList  = document.getElementById('commentsList');
 
-            const escHtml = (s) => String(s)
-                .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-                .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-
-            const fmtLocal = (v) => {
-                const ms = parseTs(v);
-                const d  = isNaN(ms) ? new Date() : new Date(ms);
-                const dd = String(d.getDate()).padStart(2,'0');
-                const MM = String(d.getMonth()+1).padStart(2,'0');
-                const YY = d.getFullYear();
-                const hh = String(d.getHours()).padStart(2,'0');
-                const mm = String(d.getMinutes()).padStart(2,'0');
-                return `${dd}.${MM}.${YY} ${hh}:${mm}`;
-            };
+            const escapeHtml = (s='') =>
+                String(s)
+                    .replace(/&/g,'&amp;')
+                    .replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;')
+                    .replace(/"/g,'&quot;')
+                    .replace(/'/g,'&#39;');
 
             commentForm?.addEventListener('submit', async (e)=>{
                 e.preventDefault();
-                const input = commentForm.querySelector('input[name="body"]');
-                const body  = (input?.value || '').trim();
-                if (!body) return;
 
-                const fd = new FormData(commentForm);
-                const btn = commentForm.querySelector('button[type="submit"]');
-                btn?.setAttribute('disabled','disabled');
+                const fd   = new FormData(commentForm);
+                const body = (fd.get('body') || '').toString().trim();
+                if (!body) return;
 
                 try{
                     const r = await fetch(commentForm.action, {
                         method: 'POST',
                         headers: {
-                            'X-CSRF-TOKEN': csrf,
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest'
                         },
@@ -327,35 +319,37 @@
                         credentials: 'same-origin'
                     });
 
-                    let data = {};
-                    try { data = await r.json(); } catch(_) {}
-                    if (!r.ok) throw new Error('HTTP '+r.status);
+                    if (!r.ok) { window.toast?.('Не удалось отправить комментарий'); return; }
+                    let data = {}; try { data = await r.json(); } catch(_){}
 
-                    const c = data?.comment || data || {};
-                    const createdAt = c.created_at || new Date().toISOString();
-                    const userName  = c?.user?.name || @json(auth()->user()->name);
-                    const text      = c.body || body;
+                    // дата для печати
+                    const iso = data?.comment?.created_at || data?.created_at || new Date().toISOString();
+                    const d   = new Date(iso);
+                    const pad = (n)=> String(n).padStart(2,'0');
+                    const pretty =
+                        `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ` +
+                        `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 
+                    const userName = data?.comment?.user?.name || data?.user?.name || @json(auth()->user()->name);
+
+                    // HTML блока комментария
+                    const html = `
+                        <div>
+                          <div class="text-xs text-slate-500">${pretty} ${userName}</div>
+                          <div>${escapeHtml(body)}</div>
+                        </div>`;
+
+                    // Удаляем плейсхолдер и ВСТАВЛЯЕМ СВЕРХУ
                     commentsList?.querySelector('.empty-comments')?.remove();
+                    commentsList?.insertAdjacentHTML('afterbegin', html);
 
-                    const wrap = document.createElement('div');
-                    wrap.innerHTML = `
-<div>
-  <div class="text-xs text-slate-500">${fmtLocal(createdAt)} — ${escHtml(userName)}</div>
-  <div>${escHtml(text)}</div>
-</div>`;
-                    commentsList?.appendChild(wrap.firstElementChild);
-
-                    input.value = '';
-                    toast('Комментарий добавлен');
+                    commentForm.reset();
+                    window.toast?.('Комментарий добавлен');
                 }catch(err){
                     console.error(err);
-                    toast('Не удалось отправить комментарий');
-                }finally{
-                    btn?.removeAttribute('disabled');
+                    window.toast?.('Ошибка сети при добавлении комментария');
                 }
             });
-            /* ======== /КОММЕНТАРИИ (AJAX) ======== */
 
             // ---------- Этапы ----------
             const stepsList = document.getElementById('stepsList');
