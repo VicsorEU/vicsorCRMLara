@@ -6,9 +6,13 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\Auditable;
+
 
 class TaskTimer extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'task_id',
         'user_id',

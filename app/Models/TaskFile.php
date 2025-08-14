@@ -5,9 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Concerns\Auditable;
+
 
 class TaskFile extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'task_id','original_name','path','size','user_id','draft_token','mime',
     ];

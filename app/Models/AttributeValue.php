@@ -5,9 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Concerns\Auditable;
+
 
 class AttributeValue extends Model
 {
+    use Auditable;
+
     protected $table = 'attribute_values';
 
     protected $fillable = ['attribute_id', 'name', 'slug', 'sort_order'];

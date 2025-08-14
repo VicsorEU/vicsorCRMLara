@@ -5,10 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Concerns\Auditable;
+
 // use Spatie\Permission\Traits\HasRoles; // раскомментируешь, когда подключим роли
 
 class User extends Authenticatable
 {
+    use Auditable;
+
     use HasFactory, Notifiable; // , HasRoles;
 
     protected $fillable = ['name', 'email', 'phone', 'company', 'password'];
