@@ -103,4 +103,7 @@ Route::middleware('auth')->group(function () {
 
     Route::delete('/settings/logo', [SettingsController::class, 'deleteLogo'])
         ->name('settings.logo.delete');
+
+    Route::post('/settings/projects/save', [SettingsController::class, 'saveProjects'])->name('settings.projects.save');
+
 });

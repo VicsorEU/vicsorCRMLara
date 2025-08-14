@@ -27,6 +27,15 @@ class SettingsController extends Controller
             return view('settings.index', compact('section','general'));
         }
 
+        if ($section === 'projects') {
+            $projects = AppSetting::get('projects', [
+                'departments' => [],
+                'types'       => [],
+                'priorities'  => [],
+            ]);
+            return view('settings.index', compact('section','projects'));
+        }
+
         return view('settings.index', compact('section'));
     }
 
@@ -79,6 +88,51 @@ class SettingsController extends Controller
             'data'    => $payload,
         ]);
     }
+
+    public function saveProjects(Request $request)
+    {
+        $validated = $request->validate([
+            'departments'   => ['nullable','array'],
+            'departments.*' => ['string','max:100'],
+            'types'         => ['nullable','array'],
+            'types.*'       => ['string','max:100'],
+            'priorities'    => ['nullable','array'],
+            'priorities.*'  => ['string','max:100'],
+        ]);
+
+        // Нормализация: trim, удаление пустых и дублей (без учёта регистра), сохранение исходного порядка
+        $norm = function ($arr) {
+            if (!is_array($arr)) return [];
+            $out = [];
+            $seen = [];
+            foreach ($arr as $v) {
+                $s = trim((string)$v);
+                if ($s === '') continue;
+                $key = mb_strtolower($s);
+                if (isset($seen[$key])) continue;
+                $seen[$key] = true;
+                $out[] = $s;
+            }
+            return array_values($out);
+        };
+
+        $payload = [
+            'departments' => $norm($validated['departments'] ?? []),
+            'types'       => $norm($validated['types'] ?? []),
+            'priorities'  => $norm($validated['priorities'] ?? []),
+        ];
+
+        AppSetting::updateOrCreate(
+            ['key' => 'projects'],
+            ['value' => $payload]     // колонка JSON/JSONB
+        );
+
+        return response()->json([
+            'message' => 'ok',
+            'data'    => $payload,
+        ]);
+    }
+
 
     public function uploadLogo(Request $r)
     {

@@ -158,6 +158,9 @@
                 </div>
             </div>
         @endif
+        @if(($section??'projects')==='projects')
+            @include('settings.projects')
+        @endif
 
         @include('shared.toast')
     </div>

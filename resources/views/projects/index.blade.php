@@ -21,7 +21,6 @@
                         <td class="py-3 px-4 font-medium">{{ $p->name }}</td>
                         <td class="py-3 px-4">{{ $p->manager->name ?? '—' }}</td>
                         <td class="py-3 px-4">{{ $p->start_date?->format('d.m.Y') ?? '—' }}</td>
-{{--                        <td class="py-3 px-4 text-right"><a class="text-brand-600 hover:underline" href="{{ route('projects.show',$p) }}">Открыть</a></td>--}}
                         <td class="py-3 px-4 text-right space-x-3">
                             <a class="text-brand-600 hover:underline" href="{{ route('projects.show',$p) }}">Открыть</a>
                             <button @click="destroy({{ $p->id }}, $event)"
