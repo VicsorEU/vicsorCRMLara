@@ -2,26 +2,57 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Project, TaskBoard, TaskColumn, Task, User};
+use App\Models\{Project, User};
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use App\Models\AppSetting;
 
 class ProjectController extends Controller
 {
     public function index()
     {
+        //return view('projects.index', compact('projects','users'));
+
+        // список отделов из настроек
+        $settings = AppSetting::get('projects', ['departments'=>[]]);
+        $departments = $settings['departments'] ?? [];
+
+        // проекты
         $projects = Project::with('manager')->orderByDesc('id')->paginate(20);
+
+        //пользователи
         $users = User::orderBy('name')->get();
-        return view('projects.index', compact('projects','users'));
+
+        // подготовим группы по отделам (+ блок "Без отдела")
+        $groups = collect();
+        foreach ($departments as $dep) {
+            $groups->put($dep, collect());
+        }
+        $groups->put('— Без отдела —', collect());
+
+        foreach ($projects as $p) {
+            $key = $p->department ?: '— Без отдела —';
+            if (!$groups->has($key)) $groups->put($key, collect());
+            $groups[$key]->push($p);
+        }
+
+        return view('projects.index', [
+            'groups'      => $groups,
+            'departments' => $departments,
+            'users'       => $users,
+        ]);
     }
 
     public function store(Request $r)
     {
+        $departments = AppSetting::get('projects', ['departments'=>[]])['departments'] ?? [];
+
         $data = $r->validate([
             'name'       => 'required|string|max:255',
             'manager_id' => 'nullable|exists:users,id',
             'start_date' => 'nullable|date',
             'note'       => 'nullable|string',
+            'department'  => ['nullable','string','max:100', Rule::in($departments)],
         ]);
         $data['created_by'] = \Auth::id();
 
@@ -55,11 +86,15 @@ class ProjectController extends Controller
 
     public function update(Request $r, Project $project)
     {
+        $departments = AppSetting::get('projects', ['departments'=>[]])['departments'] ?? [];
+
         $data = $r->validate([
             'name'       => 'required|string|max:255',
             'manager_id' => 'nullable|exists:users,id',
             'start_date' => 'nullable|date',
             'note'       => 'nullable|string',
+            'department'  => ['nullable','string','max:100', Rule::in($departments)],
+
         ]);
         $project->update($data);
 

@@ -4,6 +4,11 @@
 @section('page_title', 'Проект: '.$project->name)
 
 @section('content')
+    @php
+        $departments = $departments
+            ?? (\App\Models\AppSetting::get('projects', ['departments'=>[]])['departments'] ?? []);
+        $departments = array_values(array_unique(array_filter($departments, fn($v)=>$v !== null && $v !== '')));
+    @endphp
     <style>
         [x-cloak]{display:none!important}
         .collapse-wrap{overflow:hidden;display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
@@ -46,18 +51,43 @@
                             </select>
                         </div>
 
+                        {{-- НОВОЕ: Отдел --}}
+                        <div>
+                            <label class="block text-sm mb-1">Отдел</label>
+                            @if(count($departments))
+                                <select x-model="p.department" class="w-full border rounded-lg px-3 py-2">
+                                    <option value="">— выберите отдел —</option>
+                                    @foreach($departments as $d)
+                                        <option value="{{ $d }}">{{ $d }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="text-xs text-slate-500 mt-1">
+                                    Список отделов настраивается в “Настройки → Проекты”.
+                                </div>
+                            @else
+                                <div class="text-sm text-slate-500">
+                                    Добавьте отделы в
+                                    <a href="{{ route('settings.index',['section'=>'projects']) }}"
+                                       class="text-brand-600 hover:underline">настройках проектов</a>.
+                                </div>
+                            @endif
+                        </div>
+
                         <div class="md:col-span-3">
                             <label class="block text-sm mb-1">Заметка</label>
                             <textarea x-model="p.note" rows="3" class="w-full border rounded-lg px-3 py-2"></textarea>
                         </div>
 
                         <div class="md:col-span-3 flex justify-end gap-2">
-                            <button @click="saveProject" class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">Сохранить</button>
+                            <button @click="saveProject" class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">
+                                Сохранить
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
 
         {{-- Канбан --}}
         <div class="bg-white border rounded-2xl shadow-soft">
@@ -235,6 +265,7 @@
 
     <script>
         function projectPage(){
+
             const headersJson = {
                 'Accept':'application/json',
                 'Content-Type':'application/json',
@@ -257,6 +288,7 @@
                     start_date: @json(optional($project->start_date)->format('Y-m-d')),
                     manager_id: @json($project->manager_id),
                     note: @json($project->note),
+                    department: @json($project->department),
                 },
                 newCol:{ name:'', color:'#94a3b8' },
 
