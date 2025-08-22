@@ -11,37 +11,56 @@ class ProjectController extends Controller
 {
     public function index()
     {
-        //return view('projects.index', compact('projects','users'));
+        // Настройки
+        $settings = AppSetting::get('projects', [
+            'departments'         => [],
+            'departments_colors'  => [],
+            // если заведёшь устойчивые ID — добавь сюда 'departments_ids' => []
+        ]);
 
-        // список отделов из настроек
-        $settings = AppSetting::get('projects', ['departments'=>[]]);
-        $departments = $settings['departments'] ?? [];
+        $names  = array_values($settings['departments'] ?? []);
+        $colors = array_values($settings['departments_colors'] ?? []);
 
-        // проекты
-        $projects = Project::with('manager')->orderByDesc('id')->paginate(20);
+        // Карты id->name / id->color (id = i+1)
+        $deptIdToName  = [];
+        $deptIdToColor = [];
+        $DEF = '#94a3b8';
 
-        //пользователи
-        $users = User::orderBy('name')->get();
-
-        // подготовим группы по отделам (+ блок "Без отдела")
-        $groups = collect();
-        foreach ($departments as $dep) {
-            $groups->put($dep, collect());
+        foreach ($names as $i => $name) {
+            $id = $i + 1;
+            $deptIdToName[$id]  = trim((string)$name);
+            $deptIdToColor[$id] = $colors[$i] ?? $DEF;
         }
-        $groups->put('— Без отдела —', collect());
+
+        // Проекты
+        $projects = Project::with('manager')->orderByDesc('id')->paginate(20);
+        $users    = User::orderBy('name')->get();
+
+        // Группы: по id + специальная группа 0 = "Без отдела"
+        $groups = collect();
+        foreach (array_keys($deptIdToName) as $id) {
+            $groups->put($id, collect());
+        }
+        $groups->put(0, collect());
 
         foreach ($projects as $p) {
-            $key = $p->department ?: '— Без отдела —';
-            if (!$groups->has($key)) $groups->put($key, collect());
-            $groups[$key]->push($p);
+            $id = (int) $p->department;
+            if ($id && isset($deptIdToName[$id])) {
+                $groups[$id]->push($p);
+            } else {
+                $groups[0]->push($p);
+            }
         }
 
         return view('projects.index', [
-            'groups'      => $groups,
-            'departments' => $departments,
-            'users'       => $users,
+            'groups'        => $groups,
+            'deptIdToName'  => $deptIdToName,
+            'deptIdToColor' => $deptIdToColor,
+            'users'         => $users,
         ]);
     }
+
+
 
     public function store(Request $r)
     {
@@ -51,8 +70,9 @@ class ProjectController extends Controller
             'name'       => 'required|string|max:255',
             'manager_id' => 'nullable|exists:users,id',
             'start_date' => 'nullable|date',
+            'end_date'    => 'nullable|date',
             'note'       => 'nullable|string',
-            'department'  => ['nullable','string','max:100', Rule::in($departments)],
+            'department' => ['nullable','integer'],
         ]);
         $data['created_by'] = \Auth::id();
 
@@ -92,8 +112,9 @@ class ProjectController extends Controller
             'name'       => 'required|string|max:255',
             'manager_id' => 'nullable|exists:users,id',
             'start_date' => 'nullable|date',
+            'end_date'    => 'nullable|date',
             'note'       => 'nullable|string',
-            'department'  => ['nullable','string','max:100', Rule::in($departments)],
+            'department' => ['nullable','integer'],
 
         ]);
         $project->update($data);

@@ -5,27 +5,59 @@
 
 @section('content')
     @php
-        use App\Models\AppSetting;
-        use App\Models\User;
         use Illuminate\Support\Collection;
 
-        // 1) Отделы — только из настроек
-        $departments = $departments
-            ?? (AppSetting::get('projects', ['departments'=>[]])['departments'] ?? []);
-        $departments = array_values(array_unique(array_filter($departments, fn($v)=>$v!==null && $v!=='')));
+        $defaultColor = '#94a3b8';
 
-        // 2) Пользователи (если контроллер не передал)
-        $users = $users ?? User::orderBy('name')->get();
+        // ===== 1) Нормализуем справочник отделов =====
+        $depMeta         = $depMeta         ?? null;
+        $orderedDepIds   = $orderedDepIds   ?? null;
+        $departments     = $departments     ?? [];
+        $depColors       = $depColors       ?? [];
 
-        // 3) Группы проектов по отделам (без "Без отдела")
-        /** @var Collection $groups */
-        if (!isset($groups)) {
-            $groups = collect(array_fill_keys($departments, collect()));
-            if (isset($projects)) {
+        if (!$depMeta) {
+            $depMeta = [];
+            foreach (($departments ?? []) as $i => $name) {
+                $id = $i + 1;
+                $depMeta[$id] = [
+                    'name'  => trim((string)$name),
+                    'color' => $depColors[$i] ?? $defaultColor,
+                ];
+            }
+        }
+        if (!$orderedDepIds) {
+            $orderedDepIds = array_keys($depMeta);
+        }
+
+        $depIdByName = [];
+        foreach ($depMeta as $id => $meta) {
+            $n = $meta['name'] ?? '';
+            if ($n !== '') $depIdByName[$n] = $id;
+        }
+
+        // ===== 2) Группы проектов по ID отдела =====
+        /** @var Collection|null $groupsById */
+        $groupsById = $groupsById ?? null;
+
+        if (!$groupsById instanceof Collection) {
+            $groupsById = collect();
+
+            foreach ($orderedDepIds as $depId) $groupsById->put($depId, collect());
+            $groupsById->put(0, collect());
+
+            if (isset($groups) && $groups instanceof Collection) {
+                // Старый формат: ключ = название отдела
+                foreach ($groups as $key => $rows) {
+                    $depId = is_numeric($key) ? (int)$key : ($depIdByName[$key] ?? 0);
+                    if (!$groupsById->has($depId)) $groupsById->put($depId, collect());
+                    $groupsById[$depId] = $rows;
+                }
+            } elseif (isset($projects)) {
+                // Есть paginator/коллекция проектов — раскидаем по отделам
                 foreach ($projects as $p) {
-                    if ($p->department && in_array($p->department, $departments, true)) {
-                        $groups[$p->department] = $groups[$p->department]->push($p);
-                    }
+                    $depId = (int)($p->department ?? 0);
+                    if (!$groupsById->has($depId)) $groupsById->put($depId, collect());
+                    $groupsById[$depId]->push($p);
                 }
             }
         }
@@ -41,17 +73,23 @@
             </button>
         </div>
 
-        {{-- Список по отделам --}}
-        @forelse($departments as $dept)
-            @php $list = ($groups[$dept] ?? collect()); @endphp
+        {{-- Секции по отделам в заданном порядке --}}
+        @forelse ($groups as $deptId => $list)
+            @if($deptId === 0) @continue @endif
 
-            <div class="bg-white border rounded-2xl shadow-soft dept-block">
-                <div class="px-5 py-3 border-b flex items-center justify-between">
-                    <div class="font-medium">
-                        {{ $dept }}
-                        <span class="text-slate-400 font-normal">
-                            ( <span class="dept-counter">{{ $list->count() }}</span> )
-                        </span>
+            @php
+                $name  = $deptIdToName[$deptId]  ?? '—';
+                $color = $deptIdToColor[$deptId] ?? '#94a3b8';
+            @endphp
+
+            <div class="bg-white border rounded-2xl shadow-soft dept-block overflow-hidden">
+                <div class="px-5 py-3 border-b flex items-center justify-between rounded-t-2xl"
+                     style="background: {{ $color }};">
+                    <div class="font-medium text-white">
+                        {{ $name }}
+                        <span class="text-white/80 font-normal">
+                    ( <span class="dept-counter">{{ $list->count() }}</span> )
+                </span>
                     </div>
                 </div>
 
@@ -62,24 +100,36 @@
                             <th class="py-3 px-4">Название</th>
                             <th class="py-3 px-4">Ответственный</th>
                             <th class="py-3 px-4">Старт</th>
+                            <th class="py-3 px-4">Стоп</th>
                             <th class="py-3 px-4 w-32"></th>
                         </tr>
                         </thead>
                         <tbody>
                         @forelse($list as $p)
+                            @php
+                                $dept = $depMeta[(int)($p->department ?? 0)] ?? null;
+                                $chip = $dept ? ($dept['name'] ?? '') : '';
+                                $chipColor = $dept['color'] ?? $defaultColor;
+                            @endphp
                             <tr class="border-t project-row" data-id="{{ $p->id }}">
-                                <td class="py-3 px-4 font-medium">{{ $p->name }}</td>
+                                <td class="py-3 px-4 font-medium">
+                                    <a class="hover:underline" href="{{ route('projects.show',$p) }}">{{ $p->name }}</a>
+
+                                </td>
                                 <td class="py-3 px-4">{{ $p->manager->name ?? '—' }}</td>
                                 <td class="py-3 px-4">{{ $p->start_date?->format('d.m.Y') ?? '—' }}</td>
-                                <td class="py-3 px-4 text-right space-x-3 flex">
-                                    <a class="text-brand-600 hover:underline" href="{{ route('projects.show',$p) }}">Открыть</a>
-                                    <button @click="destroy({{ $p->id }}, $event)"
-                                            class="text-red-600 hover:underline">Удалить</button>
+                                <td class="py-3 px-4">{{ $p->end_date?->format('d.m.Y') ?? '—' }}</td>
+                                <td class="py-3 px-4 text-right">
+                                    <div class="flex items-center justify-end gap-3">
+                                        <a class="text-brand-600 hover:underline" href="{{ route('projects.show',$p) }}">Открыть</a>
+                                        <button @click="destroy({{ $p->id }}, $event)"
+                                                class="text-red-600 hover:underline">Удалить</button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr class="border-t" data-empty="1">
-                                <td class="py-4 px-4 text-slate-500" colspan="4">В этом отделе пока нет проектов</td>
+                                <td class="py-4 px-4 text-slate-500" colspan="5">В этом отделе пока нет проектов</td>
                             </tr>
                         @endforelse
                         </tbody>
@@ -94,6 +144,47 @@
                 </a>.
             </div>
         @endforelse
+
+        {{-- Блок «Без отдела» (ID = 0), если есть проекты без отдела --}}
+        @php $noDept = $groupsById[0] ?? collect(); @endphp
+        @if ($noDept->isNotEmpty())
+            <div class="bg-white border rounded-2xl shadow-soft dept-block">
+                <div class="px-5 py-3 border-b">
+                    <div class="font-medium">— Без отдела — <span class="text-slate-400">( {{ $noDept->count() }} )</span></div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="text-left text-slate-500">
+                        <tr>
+                            <th class="py-3 px-4">Название</th>
+                            <th class="py-3 px-4">Ответственный</th>
+                            <th class="py-3 px-4">Старт</th>
+                            <th class="py-3 px-4">Стоп</th>
+                            <th class="py-3 px-4 w-32"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($noDept as $p)
+                            <tr class="border-t project-row" data-id="{{ $p->id }}">
+                                <td class="py-3 px-4 font-medium">
+                                    <a class="hover:underline" href="{{ route('projects.show',$p) }}">{{ $p->name }}</a>
+                                </td>
+                                <td class="py-3 px-4">{{ $p->manager->name ?? '—' }}</td>
+                                <td class="py-3 px-4">{{ $p->start_date?->format('d.m.Y') ?? '—' }}</td>
+                                <td class="py-3 px-4">{{ $p->end_date?->format('d.m.Y') ?? '—' }}</td>
+                                <td class="py-3 px-4 text-right">
+                                    <div class="flex items-center justify-end gap-3">
+                                        <a class="text-brand-600 hover:underline" href="{{ route('projects.show',$p) }}">Открыть</a>
+                                        <button @click="destroy({{ $p->id }}, $event)" class="text-red-600 hover:underline">Удалить</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
 
         {{-- Модал создания --}}
         <div x-show="openCreate" x-cloak class="fixed inset-0 z-50">
@@ -110,10 +201,11 @@
                             <label class="block text-sm mb-1">Отдел</label>
                             <select x-model="form.department" required class="w-full border rounded-lg px-3 py-2">
                                 <option value="" disabled>— выберите отдел —</option>
-                                @foreach($departments as $d)
-                                    <option value="{{ $d }}">{{ $d }}</option>
+                                @foreach($deptIdToName as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
                                 @endforeach
                             </select>
+
                         </div>
 
                         <div>
@@ -127,24 +219,32 @@
                                 <input type="date" x-model="form.start_date" class="w-full border rounded-lg px-3 py-2">
                             </div>
                             <div>
-                                <label class="block text-sm mb-1">Ответственный</label>
-                                <select x-model="form.manager_id" class="w-full border rounded-lg px-3 py-2">
-                                    <option value="">—</option>
-                                    @foreach($users as $u)
-                                        <option value="{{ $u->id }}">{{ $u->name }}</option>
-                                    @endforeach
-                                </select>
+                                <label class="block text-sm mb-1">Дата окончания</label>
+                                <input type="date" x-model="form.end_date" class="w-full border rounded-lg px-3 py-2">
                             </div>
                         </div>
 
                         <div>
-                            <label class="block text-sm mb-1">Заметка</label>
-                            <textarea x-model="form.note" rows="3" class="w-full border rounded-lg px-3 py-2"></textarea>
+                            <label class="block text-sm mb-1">Ответственный</label>
+                            <select x-model="form.manager_id" class="w-full border rounded-lg px-3 py-2">
+                                <option value="">—</option>
+                                @foreach(($users ?? collect()) as $u)
+                                    <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
+
+                        @include('shared.rte', [
+                            'model' => 'form',
+                            'field' => 'note',
+                            'users' => ($users ?? collect())->map(fn($u)=>['id'=>$u->id,'name'=>$u->name])->values(),
+                            'placeholder' => 'Введите заметку…',
+                        ])
+
                     </div>
 
                     <div class="px-5 py-4 border-t flex justify-end gap-2">
-                        <button type="button" @click="openCreate=false" class="px-4 py-2 rounded-lg border">Отмена</button>
+                        <button type="button" class="px-4 py-2 rounded-lg border" @click="openCreate=false">Отмена</button>
                         <button class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">Создать</button>
                     </div>
                 </form>
@@ -173,7 +273,7 @@
 
             return {
                 openCreate:false,
-                form:{ department:'', name:'', manager_id:'', start_date:'', note:'' },
+                form:{ department:'', name:'', manager_id:'', start_date:'', end_date:'', note:'' },
 
                 async create(){
                     if(!this.form.department){
@@ -218,19 +318,16 @@
 
                         tr?.remove();
 
-                        // если в tbody больше нет строк проектов — показываем плейсхолдер
                         if (tbody && tbody.querySelectorAll('tr.project-row').length === 0) {
                             tbody.innerHTML = `
-                                <tr class="border-t" data-empty="1">
-                                    <td class="py-4 px-4 text-slate-500" colspan="4">
-                                        В этом отделе пока нет проектов
-                                    </td>
-                                </tr>`;
+                        <tr class="border-t" data-empty="1">
+                            <td class="py-4 px-4 text-slate-500" colspan="5">
+                                В этом отделе пока нет проектов
+                            </td>
+                        </tr>`;
                         }
 
-                        // пересчёт счётчика
                         updateDeptCounter(block);
-
                         window.toast?.('Удалено');
                     } else {
                         window.toast?.('Ошибка удаления');

@@ -17,10 +17,31 @@
     );
 
     $baseTotalSec = (int)($task->total_seconds ?? 0);
+
+    $settings = \App\Models\AppSetting::get('projects', [
+            'types'            => [], 'types_ids'          => [],
+            'priorities'       => [], 'priorities_ids'     => [],
+        ]);
+
+    // Типы задач: id => name
+        $taskTypeIdToName = [];
+        foreach (($settings['types'] ?? []) as $i => $name) {
+            $id = (int)($settings['types_ids'][$i] ?? 0);
+            $name = trim((string)$name);
+            if ($id > 0 && $name !== '') $taskTypeIdToName[$id] = $name;
+        }
+
+        // Важности: id => name
+        $priorityIdToName = [];
+        foreach (($settings['priorities'] ?? []) as $i => $name) {
+            $id = (int)($settings['priorities_ids'][$i] ?? 0);
+            $name = trim((string)$name);
+            if ($id > 0 && $name !== '') $priorityIdToName[$id] = $name;
+        }
 @endphp
 
 @section('content')
-    <div class="space-y-4">
+    <div class="space-y-4" x-data="{ taskForm: { details: @js(old('details', $task->details)) } }">
 
         {{-- Форма задачи --}}
         <form id="taskForm" method="post" action="{{ route('tasks.update',$task) }}" class="bg-white border rounded-2xl shadow-soft">
@@ -34,22 +55,29 @@
                 <div>
                     <label class="block text-sm mb-1">Тип задачи</label>
                     <select name="type" class="w-full border rounded-lg px-3 py-2">
-                        @foreach(['common'=>'Обычная','in'=>'Приход','out'=>'Расход','transfer'=>'Перемещение','adjust'=>'Корректировка'] as $v=>$t)
-                            <option value="{{ $v }}" @selected(old('type',$task->type)===$v)>{{ $t }}</option>
+                        <option value="">— выберите тип —</option>
+                        @foreach($taskTypeIdToName as $id => $name)
+                            <option value="{{ $id }}" @selected((int)old('type', $task->type) === $id)>{{ $name }}</option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-sm mb-1">Срок выполнения</label>
+                    <label class="block text-sm mb-1">Дата начала</label>
                     <input name="due_at" type="date" class="w-full border rounded-lg px-3 py-2" value="{{ optional($task->due_at)->format('Y-m-d') }}">
+                </div>
+
+                <div>
+                    <label class="block text-sm mb-1">Дата окончания</label>
+                    <input name="due_to" type="date" class="w-full border rounded-lg px-3 py-2" value="{{ optional($task->due_to)->format('Y-m-d') }}">
                 </div>
 
                 <div>
                     <label class="block text-sm mb-1">Степень важности</label>
                     <select name="priority" class="w-full border rounded-lg px-3 py-2">
-                        @foreach(['normal'=>'Обычная','high'=>'Высокая','p1'=>'Высокая (P1)','p2'=>'Критическая (P2)','low'=>'Низкая'] as $v=>$t)
-                            <option value="{{ $v }}" @selected(old('priority',$task->priority)===$v)>{{ $t }}</option>
+                        <option value="">— выберите важность —</option>
+                        @foreach($priorityIdToName as $id => $name)
+                            <option value="{{ $id }}" @selected((int)old('priority', $task->priority) === $id)>{{ $name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -58,7 +86,8 @@
                     <label class="block text-sm mb-1">Ответственный</label>
                     <select name="assignee_id" class="w-full border rounded-lg px-3 py-2">
                         <option value="">— не назначен —</option>
-                        @foreach(\App\Models\User::orderBy('name')->get() as $u)
+
+                        @foreach($users as $u)
                             <option value="{{ $u->id }}" @selected((string)old('assignee_id',$task->assignee_id)===(string)$u->id)>
                                 {{ $u->name }}
                             </option>
@@ -67,9 +96,15 @@
                 </div>
 
                 <div class="md:col-span-3">
-                    <label class="block text-sm mb-1">Описание</label>
-                    <textarea name="details" rows="4" class="w-full border rounded-lg px-3 py-2">{{ old('details',$task->details) }}</textarea>
+                    @include('shared.rte', [
+                                'model' => 'taskForm',
+                                'field' => 'details',
+                                'users' => $users->map(fn($u)=>['id'=>$u->id,'name'=>$u->name])->values(),
+                                'placeholder' => 'Введите заметку…',
+                            ])
                 </div>
+                <input type="hidden" name="details" x-model="taskForm.details">
+
 
                 <div class="md:col-span-3 flex items-center gap-2">
                     <button type="button" id="btnTimerStart" class="px-3 py-2 rounded-lg border">▶ Старт таймера</button>

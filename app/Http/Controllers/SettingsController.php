@@ -6,7 +6,7 @@ use App\Models\AppSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-
+use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
 {
@@ -28,11 +28,65 @@ class SettingsController extends Controller
         }
 
         if ($section === 'projects') {
-            $projects = AppSetting::get('projects', [
-                'departments' => [],
-                'types'       => [],
-                'priorities'  => [],
-            ]);
+            // дефолтные ключи + colors + ids для ВСЕХ групп
+            $defaults = [
+                'departments'        => [], 'departments_colors'  => [], 'departments_ids'  => [],
+                'types'              => [], 'types_colors'        => [], 'types_ids'        => [],
+                'priorities'         => [], 'priorities_colors'   => [], 'priorities_ids'   => [],
+                'randlables'         => [], 'randlables_colors'   => [], 'randlables_ids'   => [],
+                'grades'             => [], 'grades_colors'       => [], 'grades_ids'       => [],
+            ];
+            $projects = AppSetting::get('projects', $defaults);
+
+            $DEF = '#94a3b8';
+            $groups = ['departments','types','priorities','randlables','grades'];
+
+            // Нормализация для отображения формы: выровнять длины и подставить дефолтные цвета/ID
+            foreach ($groups as $g) {
+                $ck = $g.'_colors';
+                $ik = $g.'_ids';
+
+                // имена
+                $names = array_values(array_filter(
+                    array_map(fn($v)=>trim((string)$v), $projects[$g] ?? []),
+                    fn($v)=>$v!==''
+                ));
+
+                // цвета
+                $inColors = is_array($projects[$ck] ?? null) ? $projects[$ck] : [];
+                $colors = [];
+                foreach ($names as $i => $_) {
+                    $c = $inColors[$i] ?? $DEF;
+                    $colors[$i] = preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', (string)$c) ? $c : $DEF;
+                }
+
+                // id
+                $inIds = is_array($projects[$ik] ?? null) ? $projects[$ik] : [];
+                $used  = [];
+                foreach ($inIds as $x) {
+                    $n = (int)$x;
+                    if ($n > 0) $used[$n] = true;
+                }
+                $next = empty($used) ? 0 : max(array_keys($used));
+                $ids = [];
+                for ($i=0; $i<count($names); $i++) {
+                    $cand = (int)($inIds[$i] ?? 0);
+                    if ($cand > 0 && !isset($ids[$i])) {
+                        $ids[$i] = $cand;
+                        $used[$cand] = true;
+                    } else {
+                        // выдаём новый уникальный id
+                        do { $cand = ++$next; } while(isset($used[$cand]));
+                        $ids[$i] = $cand;
+                        $used[$cand] = true;
+                    }
+                }
+
+                $projects[$g]    = $names;
+                $projects[$ck]   = $colors;
+                $projects[$ik]   = $ids;
+            }
+
             return view('settings.index', compact('section','projects'));
         }
 
@@ -50,7 +104,6 @@ class SettingsController extends Controller
             'workdays'     => ['nullable', 'array'],
             'workdays.*'   => ['in:mon,tue,wed,thu,fri,sat,sun'],
 
-            // ВАЖНО: валидируем КАЖДЫЙ интервал
             'intervals'           => ['required', 'array', 'min:1'],
             'intervals.*.days'    => ['required', 'array', 'min:1'],
             'intervals.*.days.*'  => ['in:mon,tue,wed,thu,fri,sat,sun'],
@@ -58,14 +111,13 @@ class SettingsController extends Controller
             'intervals.*.end'     => ['required', 'date_format:H:i'],
         ]);
 
-        // Нормализуем и сохраняем ВСЕ интервалы
         $intervals = array_values(array_map(function(array $it) {
             $days = array_values(array_unique($it['days'] ?? []));
-            sort($days); // чтобы порядок был стабильным
+            sort($days);
             return [
                 'days'  => $days,
-                'start' => substr($it['start'], 0, 5), // HH:MM
-                'end'   => substr($it['end'],   0, 5), // HH:MM
+                'start' => substr($it['start'], 0, 5),
+                'end'   => substr($it['end'],   0, 5),
             ];
         }, $validated['intervals'] ?? []));
 
@@ -80,7 +132,7 @@ class SettingsController extends Controller
 
         AppSetting::updateOrCreate(
             ['key' => 'general'],
-            ['value' => $payload] // колонка JSON/JSONB
+            ['value' => $payload]
         );
 
         return response()->json([
@@ -91,48 +143,152 @@ class SettingsController extends Controller
 
     public function saveProjects(Request $request)
     {
-        $validated = $request->validate([
-            'departments'   => ['nullable','array'],
-            'departments.*' => ['string','max:100'],
-            'types'         => ['nullable','array'],
-            'types.*'       => ['string','max:100'],
-            'priorities'    => ['nullable','array'],
-            'priorities.*'  => ['string','max:100'],
+        // принимаем имена и цвета (ID не ждём от формы — считаем на бэке)
+        $rules = [
+            'departments'          => ['nullable','array'],
+            'departments.*'        => ['string','max:100'],
+            'departments_colors'   => ['nullable','array'],
+            'departments_colors.*' => ['nullable','regex:/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/'],
+
+            'types'                => ['nullable','array'],
+            'types.*'              => ['string','max:100'],
+            'types_colors'         => ['nullable','array'],
+            'types_colors.*'       => ['nullable','regex:/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/'],
+
+            'priorities'           => ['nullable','array'],
+            'priorities.*'         => ['string','max:100'],
+            'priorities_colors'    => ['nullable','array'],
+            'priorities_colors.*'  => ['nullable','regex:/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/'],
+
+            'randlables'           => ['nullable','array'],
+            'randlables.*'         => ['string','max:100'],
+            'randlables_colors'    => ['nullable','array'],
+            'randlables_colors.*'  => ['nullable','regex:/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/'],
+
+            'grades'               => ['nullable','array'],
+            'grades.*'             => ['string','max:100'],
+            'grades_colors'        => ['nullable','array'],
+            'grades_colors.*'      => ['nullable','regex:/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/'],
+        ];
+        $validated = $request->validate($rules);
+
+        $DEF = '#94a3b8';
+        $validColor = fn($c) => is_string($c) && preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $c);
+
+        // Текущие сохранённые настройки (обязательно с *_ids)
+        $current = AppSetting::get('projects', [
+            'departments'=>[], 'departments_colors'=>[], 'departments_ids'=>[],
+            'types'=>[],       'types_colors'=>[],       'types_ids'=>[],
+            'priorities'=>[],  'priorities_colors'=>[],  'priorities_ids'=>[],
+            'randlables'=>[],  'randlables_colors'=>[],  'randlables_ids'=>[],
+            'grades'=>[],      'grades_colors'=>[],      'grades_ids'=>[],
         ]);
 
-        // Нормализация: trim, удаление пустых и дублей (без учёта регистра), сохранение исходного порядка
-        $norm = function ($arr) {
+        // helper: нормализация имён (trim + uniq по lc, с сохранением первого в исходном порядке)
+        $normNames = function (?array $arr): array {
             if (!is_array($arr)) return [];
-            $out = [];
-            $seen = [];
+            $out = []; $seen = [];
             foreach ($arr as $v) {
                 $s = trim((string)$v);
                 if ($s === '') continue;
-                $key = mb_strtolower($s);
-                if (isset($seen[$key])) continue;
-                $seen[$key] = true;
+                $k = mb_strtolower($s);
+                if (isset($seen[$k])) continue;
+                $seen[$k] = true;
                 $out[] = $s;
             }
             return array_values($out);
         };
 
-        $payload = [
-            'departments' => $norm($validated['departments'] ?? []),
-            'types'       => $norm($validated['types'] ?? []),
-            'priorities'  => $norm($validated['priorities'] ?? []),
-        ];
+        /**
+         * Универсальный расчёт для группы: имена+цвета+стабильные ID
+         * @return array [names, colors, ids]
+         */
+        $calcGroup = function (string $g) use ($validated, $current, $normNames, $validColor, $DEF): array {
+            $cKey = $g.'_colors';
+            $iKey = $g.'_ids';
 
-        AppSetting::updateOrCreate(
-            ['key' => 'projects'],
-            ['value' => $payload]     // колонка JSON/JSONB
-        );
+            // вход
+            $inNames  = $normNames($validated[$g] ?? []);
+            $inColors = $validated[$cKey] ?? [];
 
-        return response()->json([
-            'message' => 'ok',
-            'data'    => $payload,
-        ]);
+            // прошлые
+            $prevNames  = array_values($current[$g]    ?? []);
+            $prevColors = array_values($current[$cKey] ?? []);
+            $prevIds    = array_values($current[$iKey] ?? []);
+
+            // карта "старое имя (lc) -> [id,color]"
+            $prevMap = [];
+            foreach ($prevNames as $i=>$n) {
+                $prevMap[mb_strtolower((string)$n)] = [
+                    'id'    => (int)($prevIds[$i] ?? ($i+1)),
+                    'color' => $prevColors[$i] ?? $DEF,
+                ];
+            }
+
+            // определим следующий id в этой группе
+            $nextId = 0;
+            foreach ($prevIds as $x) { $nextId = max($nextId, (int)$x); }
+
+            $outNames  = $inNames;
+            $outColors = [];
+            $outIds    = [];
+
+            foreach ($inNames as $i => $name) {
+                $lc = mb_strtolower($name);
+
+                // цвет: из входа, иначе — из прошлых, иначе дефолт
+                $candColor = $inColors[$i] ?? null;
+                $prevColor = $prevMap[$lc]['color'] ?? null;
+                $outColors[] = $validColor($candColor) ? $candColor : ($validColor($prevColor) ? $prevColor : $DEF);
+
+                // id: если имя было — оставить прежний id, иначе выдать новый
+                if (isset($prevMap[$lc])) {
+                    $outIds[] = (int)$prevMap[$lc]['id'];
+                } else {
+                    $outIds[] = ++$nextId;
+                }
+            }
+
+            return [$outNames, $outColors, $outIds];
+        };
+
+        $payload = [];
+
+        // Считаем для всех групп (включая departments)
+        foreach (['departments','types','priorities','randlables','grades'] as $group) {
+            [$names, $colors, $ids] = $calcGroup($group);
+            $payload[$group]           = $names;
+            $payload[$group.'_colors'] = $colors;
+            $payload[$group.'_ids']    = $ids;
+        }
+
+        // Сохраняем настройки
+        AppSetting::updateOrCreate(['key' => 'projects'], ['value' => $payload]);
+
+        // ----- Синхронизация связей ТОЛЬКО для departments (projects.department) -----
+        // 1) Обнулим department у проектов, где ID удалён
+        $prevDepIds = array_values($current['departments_ids'] ?? []);
+        $newDepIds  = array_values($payload['departments_ids'] ?? []);
+        $removedIds = array_diff(array_map('intval',$prevDepIds ?: []), array_map('intval',$newDepIds ?: []));
+        if (!empty($removedIds)) {
+            DB::table('projects')->whereIn('department', $removedIds)->update(['department' => null]);
+        }
+
+        // 2) Миграция старых строковых значений department -> ID (на случай старых записей)
+        //    Проходим по актуальному списку имён и подставляем соответствующий ID
+        foreach (($payload['departments'] ?? []) as $i => $name) {
+            $id = (int)($payload['departments_ids'][$i] ?? 0);
+            if ($id > 0 && $name !== '') {
+                DB::table('projects')->where('department', $name)->update(['department' => $id]);
+            }
+        }
+
+        // ВАЖНО: для типов/важностей и прочего мы тут НИЧЕГО не мигрируем,
+        // потому что их хранение в задачах у вас сейчас строковое и/или под CHECK-constraint.
+        // Если позже переведёте задачи на хранение по *_id — добавите аналогичные апдейты.
+
+        return response()->json(['message' => 'ok', 'data' => $payload]);
     }
-
 
     public function uploadLogo(Request $r)
     {
@@ -143,7 +299,6 @@ class SettingsController extends Controller
         $path = $r->file('file')->store('company', 'public');
         $url  = Storage::disk('public')->url($path);
 
-        // сразу кладём в настройки текущий url логотипа
         $general = AppSetting::get('general', []);
         $general['logo_url'] = $url;
         AppSetting::put('general', $general);
@@ -158,7 +313,6 @@ class SettingsController extends Controller
 
         $url = $val['logo_url'] ?? null;
         if ($url) {
-            // извлекаем путь относительно диска public
             $path = Str::after($url, '/storage/');
             if ($path && Storage::disk('public')->exists($path)) {
                 Storage::disk('public')->delete($path);

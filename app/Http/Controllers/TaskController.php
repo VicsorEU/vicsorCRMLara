@@ -9,10 +9,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use App\Models\{Project, User};
 
 class TaskController extends Controller
 {
-    /** Создание задачи (используется модалка на доске) */
     /** Создание задачи (используется модалка на доске) */
     public function store(Request $request)
     {
@@ -22,20 +22,25 @@ class TaskController extends Controller
             'title'       => ['required','string','max:255'],
             'details'     => ['nullable','string'],
             'due_at'      => ['nullable','date'],
-            'priority'    => ['nullable','string','max:20'],
-            'type'        => ['nullable','string','max:20'],
+            'due_to'      => ['nullable','date'],
+            'priority'    => ['nullable','integer','min:1'],
+            'type'        => ['nullable','integer','min:1'],
             'assignee_id' => ['nullable','integer'],
             'steps'       => ['nullable'],              // может прийти строкой JSON
             'draft_token' => ['nullable','string','max:100'],
         ]);
 
         // дефолты
-        $data['priority']   = $data['priority']   ?? 'normal';
-        $data['type']       = $data['type']       ?? 'common';
+        $data['priority']   = $data['priority']   ?? '1';
+        $data['type']       = $data['type']       ?? '1';
         $data['created_by'] = Auth::id();
 
         if (!empty($data['due_at'])) {
             $data['due_at'] = Carbon::parse($data['due_at'])->toDateString();
+        }
+
+        if (!empty($data['due_to'])) {
+            $data['due_to'] = Carbon::parse($data['due_to'])->toDateString();
         }
 
         // steps: если пришло строкой — декодируем
@@ -64,6 +69,10 @@ class TaskController extends Controller
         // если в модели нет кастов, убедимся что due_at — Carbon (на всякий случай)
         if ($task->due_at && !($task->due_at instanceof Carbon)) {
             $task->due_at = Carbon::parse($task->due_at);
+        }
+
+        if ($task->due_to && !($task->due_to instanceof Carbon)) {
+            $task->due_to = Carbon::parse($task->due_to);
         }
 
         // Рендерим ту же карточку, что используется на доске
@@ -109,17 +118,22 @@ class TaskController extends Controller
     {
         $data = $request->validate([
             'title'       => ['required','string','max:255'],
-            'type'        => ['required','string','max:20'],
-            'priority'    => ['required','string','max:20'],
+            'priority'    => ['nullable','integer','min:1'],
+            'type'        => ['nullable','integer','min:1'],
             'assignee_id' => ['nullable','exists:users,id'],
             'details'     => ['nullable','string'],
             'due_at'      => ['nullable','date'],
+            'due_to'      => ['nullable','date'],
             'steps'       => ['nullable'],              // строка JSON или массив
             'draft_token' => ['nullable','string','max:100'], // новые файлы во время редактирования
         ]);
 
         if (!empty($data['due_at'])) {
             $data['due_at'] = Carbon::parse($data['due_at'])->toDateString();
+        }
+
+        if (!empty($data['due_to'])) {
+            $data['due_to'] = Carbon::parse($data['due_to'])->toDateString();
         }
 
         // steps: строка JSON -> массив
@@ -171,6 +185,8 @@ class TaskController extends Controller
     public function show(Task $task)
     {
         $task->load(['files','comments.user','assignee','creator','column','timers.user']);
-        return view('tasks.show', compact('task'));
+        $users = User::orderBy('name')->get();
+        $usersMap = $users->pluck('name','id');
+        return view('tasks.show', compact('task','users','usersMap'));
     }
 }

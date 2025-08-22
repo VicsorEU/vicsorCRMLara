@@ -31,7 +31,7 @@
                                     <div class="font-medium">{{ $task->title }}</div>
                                     <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
                                         @if($task->due_at)
-                                            <span class="px-2 py-0.5 rounded-full bg-slate-100 border">до {{ $task->due_at->format('d.m.Y') }}</span>
+                                            <span class="px-2 py-0.5 rounded-full bg-slate-100 border">до {{ $task->due_to->format('d.m.Y') }}</span>
                                         @endif
                                         @if($task->priority !== 'normal')
                                             <span class="px-2 py-0.5 rounded-full bg-slate-100 border">{{ strtoupper($task->priority) }}</span>

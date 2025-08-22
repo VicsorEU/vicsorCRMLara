@@ -5,10 +5,39 @@
 
 @section('content')
     @php
-        $departments = $departments
-            ?? (\App\Models\AppSetting::get('projects', ['departments'=>[]])['departments'] ?? []);
-        $departments = array_values(array_unique(array_filter($departments, fn($v)=>$v !== null && $v !== '')));
+        $settings = \App\Models\AppSetting::get('projects', [
+            'departments'      => [], 'departments_ids'    => [],
+            'types'            => [], 'types_ids'          => [],
+            'priorities'       => [], 'priorities_ids'     => [],
+        ]);
+
+        // Отделы: id => name (если нужно)
+        $deptIdToName = [];
+        foreach (($settings['departments'] ?? []) as $i => $name) {
+            $id = (int)($settings['departments_ids'][$i] ?? 0);
+            $name = trim((string)$name);
+            if ($id > 0 && $name !== '') $deptIdToName[$id] = $name;
+        }
+
+        // Типы задач: id => name
+        $taskTypeIdToName = [];
+        foreach (($settings['types'] ?? []) as $i => $name) {
+            $id = (int)($settings['types_ids'][$i] ?? 0);
+            $name = trim((string)$name);
+            if ($id > 0 && $name !== '') $taskTypeIdToName[$id] = $name;
+        }
+
+        // Важности: id => name
+        $priorityIdToName = [];
+        foreach (($settings['priorities'] ?? []) as $i => $name) {
+            $id = (int)($settings['priorities_ids'][$i] ?? 0);
+            $name = trim((string)$name);
+            if ($id > 0 && $name !== '') $priorityIdToName[$id] = $name;
+        }
     @endphp
+
+
+
     <style>
         [x-cloak]{display:none!important}
         .collapse-wrap{overflow:hidden;display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
@@ -42,6 +71,12 @@
                         </div>
 
                         <div>
+                            <label class="block text-sm mb-1">Дата окончания</label>
+                            <input type="date" x-model="p.end_date" class="w-full border rounded-lg px-3 py-2">
+                        </div>
+
+
+                        <div>
                             <label class="block text-sm mb-1">Ответственный</label>
                             <select x-model="p.manager_id" class="w-full border rounded-lg px-3 py-2">
                                 <option value="">—</option>
@@ -54,11 +89,11 @@
                         {{-- НОВОЕ: Отдел --}}
                         <div>
                             <label class="block text-sm mb-1">Отдел</label>
-                            @if(count($departments))
-                                <select x-model="p.department" class="w-full border rounded-lg px-3 py-2">
+                            @if(count($deptIdToName))
+                                <select x-model.number="p.department" class="w-full border rounded-lg px-3 py-2">
                                     <option value="">— выберите отдел —</option>
-                                    @foreach($departments as $d)
-                                        <option value="{{ $d }}">{{ $d }}</option>
+                                    @foreach($deptIdToName as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
                                     @endforeach
                                 </select>
                                 <div class="text-xs text-slate-500 mt-1">
@@ -73,10 +108,17 @@
                             @endif
                         </div>
 
+
                         <div class="md:col-span-3">
-                            <label class="block text-sm mb-1">Заметка</label>
-                            <textarea x-model="p.note" rows="3" class="w-full border rounded-lg px-3 py-2"></textarea>
+                            @include('shared.rte', [
+                                    'model' => 'p',
+                                    'field' => 'note',
+                                    'users' => $users->map(fn($u)=>['id'=>$u->id,'name'=>$u->name])->values(),
+                                    'placeholder' => 'Введите заметку…',
+                                ])
                         </div>
+
+
 
                         <div class="md:col-span-3 flex justify-end gap-2">
                             <button @click="saveProject" class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">
@@ -164,38 +206,52 @@
                                     @endforeach
                                 </select>
                             </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-sm mb-1">Срок</label>
+                                <label class="block text-sm mb-1">Дата начала</label>
                                 <input type="date" x-model="taskForm.due_at" class="w-full border rounded-lg px-3 py-2">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm mb-1">Дата окончания</label>
+                                <input type="date" x-model="taskForm.due_to" class="w-full border rounded-lg px-3 py-2">
                             </div>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-sm mb-1">Тип</label>
-                                <select x-model="taskForm.type" class="w-full border rounded-lg px-3 py-2">
-                                    <option value="common">Обычная</option>
-                                    <option value="in">Приход</option>
-                                    <option value="out">Расход</option>
-                                    <option value="transfer">Перемещение</option>
-                                    <option value="adjust">Корректировка</option>
+                                <label class="block text-sm mb-1">Тип задачи</label>
+                                <select x-model.number="taskForm.type" class="w-full border rounded-lg px-3 py-2">
+                                    <option value="">— выберите тип —</option>
+                                    @foreach($taskTypeIdToName as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
                                 </select>
+
                             </div>
+
                             <div>
                                 <label class="block text-sm mb-1">Важность</label>
-                                <select x-model="taskForm.priority" class="w-full border rounded-lg px-3 py-2">
-                                    <option value="low">Низкая</option>
-                                    <option value="normal">Обычная</option>
-                                    <option value="high">Высокая</option>
-                                    <option value="p1">P1</option>
-                                    <option value="p2">P2</option>
+                                <select x-model.number="taskForm.priority" class="w-full border rounded-lg px-3 py-2">
+                                    <option value="">— выберите важность —</option>
+                                    @foreach($priorityIdToName as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
                                 </select>
+
                             </div>
+
                         </div>
 
-                        <div>
-                            <label class="block text-sm mb-1">Описание</label>
-                            <textarea x-model="taskForm.details" rows="3" class="w-full border rounded-lg px-3 py-2"></textarea>
+                        <div x-ref="rteTaskDetails">
+                            @include('shared.rte', [
+                                'model' => 'taskForm',
+                                'field' => 'details',
+                                'users' => $users->map(fn($u)=>['id'=>$u->id,'name'=>$u->name])->values(),
+                                'placeholder' => 'Введите заметку…',
+                            ])
                         </div>
 
                         {{-- Этапы --}}
@@ -286,6 +342,7 @@
                 p: {
                     name: @json($project->name),
                     start_date: @json(optional($project->start_date)->format('Y-m-d')),
+                    end_date:   @json(optional($project->end_date)->format('Y-m-d')),
                     manager_id: @json($project->manager_id),
                     note: @json($project->note),
                     department: @json($project->department),
@@ -300,8 +357,9 @@
                     title:'',
                     details:'',
                     due_at:'',
-                    priority:'normal',
-                    type:'common',
+                    due_to:'',
+                    priority:'',
+                    type:'',
                     assignee_id:'',
                     draft_token:'',
                 },
@@ -356,6 +414,9 @@
                 // ---------- проект ----------
                 async saveProject(){
                     try{
+                        // взять HTML из редактора заметки
+                        this.p.note = this.readRte('rteProjectNote', this.p.note);
+
                         const r = await fetch('{{ route('projects.update',$project) }}', {
                             method:'PATCH', headers:headersJson, credentials:'same-origin',
                             body: JSON.stringify(this.p)
@@ -466,7 +527,7 @@
                 openTaskModal(columnId){
                     this.taskForm = {
                         board_id: boardId, column_id: columnId, title:'', details:'',
-                        due_at:'', priority:'normal', type:'common', assignee_id:'',
+                        due_at:'', due_to:'', priority:'', type:'', assignee_id:'',
                         draft_token: self.crypto?.randomUUID?.() ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2))
                     };
                     this.steps = [];
@@ -567,11 +628,29 @@
                 },
 
                 // ---------- создание задачи ----------
+                readRte(refName, fallback=''){
+                    const root = this.$refs?.[refName];
+                    if (!root) return fallback || '';
+                    const ed = root.querySelector('[contenteditable]');
+                    const val = ed ? ed.innerHTML : '';
+                    // иногда miniRTE может засунуть DOM-узел в модель и получить "[object HTMLInputElement]"
+                    if (val && val !== '[object HTMLInputElement]') return val;
+                    return fallback || '';
+                },
+                setRte(refName, html=''){
+                    const root = this.$refs?.[refName];
+                    const ed = root?.querySelector('[contenteditable]');
+                    if (ed) ed.innerHTML = html || '';
+                },
                 async createTaskFromModal(){
+                    const detailsHtml = this.readRte('rteTaskDetails', this.taskForm.details);
+
                     const payload = {
                         ...this.taskForm,
+                        details: detailsHtml,
                         steps: this.steps
                     };
+
                     const colEl = document.querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`);
                     if (!colEl) { toast('Колонка не найдена'); return; }
 
@@ -595,12 +674,12 @@
                             const title = this.escapeHtml(this.taskForm.title || ('Задача #'+id));
                             const href  = @json(url('/tasks')) + '/' + id;
                             html = `
-<a href="${href}"
-   class="block bg-white border rounded-xl hover:shadow-soft transition p-3 kanban-card"
-   data-id="${id}">
-  <div class="font-medium">${title}</div>
-  <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-600"></div>
-</a>`;
+                                <a href="${href}"
+                                   class="block bg-white border rounded-xl hover:shadow-soft transition p-3 kanban-card"
+                                   data-id="${id}">
+                                  <div class="font-medium">${title}</div>
+                                  <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-600"></div>
+                                </a>`;
                         }
 
                         colEl.insertAdjacentHTML('beforeend', html);

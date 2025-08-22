@@ -17,13 +17,16 @@ class Task extends Model
     use HasFactory;
 
     protected $fillable = [
-        'board_id','column_id','title','details','due_at',
+        'board_id','column_id','title','details','due_at','due_to',
         'priority','type','assignee_id','steps',
     ];
 
     protected $casts = [
         'steps'  => 'array',
         'due_at' => 'datetime',
+        'due_to' => 'datetime',
+        'type' => 'integer',
+        'priority' => 'integer',
     ];
 
     protected static function booted(): void
