@@ -42,34 +42,51 @@
                         $props = $a->properties ?? collect();
                         $old   = $props['old'] ?? [];
                         $new   = $props['attributes'] ?? [];
+
                         // компактный diff: только изменённые ключи
                         $diffKeys = collect(array_keys((array)$new))
                           ->filter(fn($k)=> (array_key_exists($k,$old) ? $old[$k] !== $new[$k] : true))
                           ->take(8);
+
+                        // БЕЗОПАСНОЕ форматирование для вывода
+                        $fmtVal = function($v) {
+                            if (is_null($v)) return '—';
+                            if (is_bool($v)) return $v ? 'true' : 'false';
+                            if ($v instanceof \Carbon\CarbonInterface) return $v->format('Y-m-d H:i:s');
+                            if (is_array($v) || is_object($v)) {
+                                return \Illuminate\Support\Str::limit(
+                                    json_encode($v, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+                                    160
+                                );
+                            }
+                            return \Illuminate\Support\Str::limit((string)$v, 160);
+                        };
                     @endphp
+
                     <tr class="border-t align-top">
                         <td class="py-2 pr-4 whitespace-nowrap">{{ $a->created_at->format('Y-m-d H:i') }}</td>
                         <td class="py-2 pr-4">{{ optional($a->causer)->name ?? '—' }}</td>
                         <td class="py-2 pr-4">{{ class_basename($a->subject_type) }}</td>
                         <td class="py-2 pr-4">{{ $a->event ?? $a->description }}</td>
-                        <td class="py-2 pr-4">{{ $props['label'] ?? (class_basename($a->subject_type).' #'.$a->subject_id) }}</td>
-                        <td class="py-2 pr-4">
+                        <td class="py-2 pr-4">{{ $fmtVal($props['label'] ?? (class_basename($a->subject_type).' #'.$a->subject_id)) }}</td>                        <td class="py-2 pr-4">
                             @if($diffKeys->isEmpty())
                                 <span class="text-slate-400">—</span>
                             @else
                                 <ul class="list-disc pl-4">
                                     @foreach($diffKeys as $k)
+                                        @php($ov = data_get($old, $k))
+                                        @php($nv = data_get($new, $k))
                                         <li>
                                             <span class="text-slate-500">{{ $k }}:</span>
-                                            <span class="line-through text-slate-400">{{ data_get($old,$k) }}</span>
+                                            <span class="line-through text-slate-400">{{ $fmtVal($ov) }}</span>
                                             →
-                                            <span class="font-medium">{{ data_get($new,$k) }}</span>
+                                            <span class="font-medium">{{ $fmtVal($nv) }}</span>
                                         </li>
                                     @endforeach
                                 </ul>
                             @endif
                         </td>
-                        <td class="py-2 pr-4">{{ $props['ip'] ?? '' }}</td>
+                        <td class="py-2 pr-4">{{ $fmtVal($props['ip'] ?? '') }}</td>
                     </tr>
                 @endforeach
                 </tbody>

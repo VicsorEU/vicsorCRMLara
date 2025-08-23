@@ -90,12 +90,14 @@
                         <div>
                             <label class="block text-sm mb-1">Отдел</label>
                             @if(count($deptIdToName))
+                                <?php print_r($project->department); ?>
                                 <select x-model.number="p.department" class="w-full border rounded-lg px-3 py-2">
                                     <option value="">— выберите отдел —</option>
                                     @foreach($deptIdToName as $id => $name)
-                                        <option value="{{ $id }}">{{ $name }}</option>
+                                        <option value="{{ $id }}" @selected($project->department===$id)>{{ $name }}</option>
                                     @endforeach
                                 </select>
+
                                 <div class="text-xs text-slate-500 mt-1">
                                     Список отделов настраивается в “Настройки → Проекты”.
                                 </div>
