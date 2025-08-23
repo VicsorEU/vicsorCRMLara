@@ -1,53 +1,47 @@
 @php
-    use App\Models\AppSetting;
+    use App\Models\Settings\ProjectTaskType;
+    use App\Models\Settings\ProjectTaskPriority;
 
-    // Кешируем мапы, чтобы не читать настройки на каждую карточку
-    static $__maps = null;
-    if ($__maps === null) {
-        $cfg = AppSetting::get('projects', [
-            'types' => [], 'types_colors' => [], 'types_ids' => [],
-            'priorities' => [], 'priorities_colors' => [], 'priorities_ids' => [],
-        ]);
+    /** Кэши на время рендера страницы */
+    static $typeById = null, $typeByName = null, $prioById = null, $prioByName = null;
 
-        $makeMap = function(array $names, array $colors, array $ids): array {
-            $byId = $byName = [];
-            $def = '#94a3b8';
-            foreach ($names as $i => $name) {
-                $name  = trim((string)$name);
-                if ($name === '') continue;
-                $color = $colors[$i] ?? $def;
-                $id    = (int)($ids[$i] ?? ($i+1));
-                // нормализуем цвет к #RRGGBB
-                if (preg_match('/^#([0-9a-f]{3})$/i', $color, $m)) {
-                    $color = '#'.$m[1][0].$m[1][0].$m[1][1].$m[1][1].$m[1][2].$m[1][2];
-                } elseif (!preg_match('/^#([0-9a-f]{6})$/i', $color)) {
-                    $color = $def;
-                }
-                $byId[$id] = ['name'=>$name, 'color'=>$color];
-                $byName[mb_strtolower($name)] = ['name'=>$name, 'color'=>$color];
-            }
-            return ['byId'=>$byId, 'byName'=>$byName];
-        };
+    if ($typeById === null) {
+        $types = ProjectTaskType::query()->get(['id','name','color']);
+        $prios = ProjectTaskPriority::query()->get(['id','name','color']);
 
-        $__maps = [
-            'type'     => $makeMap($cfg['types'] ?? [], $cfg['types_colors'] ?? [], $cfg['types_ids'] ?? []),
-            'priority' => $makeMap($cfg['priorities'] ?? [], $cfg['priorities_colors'] ?? [], $cfg['priorities_ids'] ?? []),
-        ];
+        $typeById   = $types->keyBy('id');
+        $prioById   = $prios->keyBy('id');
+        $typeByName = $types->mapWithKeys(fn($i)=>[mb_strtolower($i->name)=>$i]);
+        $prioByName = $prios->mapWithKeys(fn($i)=>[mb_strtolower($i->name)=>$i]);
     }
 
-    $resolve = function($val, $kind) use ($__maps) {
-        if ($val === null || $val === '') return null;
-        $map = $__maps[$kind] ?? ['byId'=>[], 'byName'=>[]];
-        if (is_numeric($val)) {
-            return $map['byId'][(int)$val] ?? null;
+    /** Достаём метаданные для type/priority (поддержка старых строковых значений) */
+    $metaType = null;
+    if ($task->type_id !== null && $task->type_id !== '') {
+        $metaType = is_numeric($task->type_id)
+            ? ($typeById->get((int)$task->type_id) ?? null)
+            : ($typeByName->get(mb_strtolower((string)$task->type_id)) ?? null);
+    }
+
+    $metaPrio = null;
+    if ($task->priority_id !== null && $task->priority_id !== '') {
+        $metaPrio = is_numeric($task->priority_id)
+            ? ($prioById->get((int)$task->priority_id) ?? null)
+            : ($prioByName->get(mb_strtolower((string)$task->priority_id)) ?? null);
+    }
+
+    /** Прозрачный фон для чипа на базе hex */
+    $chipBg = function (?string $hex) {
+        $hex = is_string($hex) ? trim($hex) : '';
+        // нормализуем #RGB -> #RRGGBB
+        if (preg_match('/^#([0-9a-f]{3})$/i', $hex, $m)) {
+            $hex = '#'.$m[1][0].$m[1][0].$m[1][1].$m[1][1].$m[1][2].$m[1][2];
         }
-        return $map['byName'][mb_strtolower((string)$val)] ?? null; // на случай старых строк
+        if (!preg_match('/^#([0-9a-f]{6})$/i', $hex)) {
+            $hex = '#94a3b8';
+        }
+        return $hex.'1a'; // #RRGGBBAA (≈10% прозрачности)
     };
-
-    $metaType = $resolve($task->type, 'type');           // ['name','color'] | null
-    $metaPrio = $resolve($task->priority, 'priority');   // ['name','color'] | null
-
-    $bg = function(?string $hex){ return $hex ? ($hex.'1a') : '#94a3b81a'; }; // прозрачный фон под чип
 @endphp
 
 <a href="{{ route('tasks.show', $task) }}"
@@ -68,19 +62,17 @@
             </span>
         @endif
 
-        {{-- PRIORITY (по id/строке + цвет из настроек) --}}
         @if($metaPrio)
             <span class="inline-flex items-center rounded px-1.5 py-0.5"
-                  style="background: {{ $bg($metaPrio['color']) }}; color: {{ $metaPrio['color'] }};">
-                {{ $metaPrio['name'] }}
+                  style="background: {{ $chipBg($metaPrio->color) }}; color: {{ $metaPrio->color }};">
+                {{ $metaPrio->name }}
             </span>
         @endif
 
-        {{-- TYPE (по id/строке + цвет из настроек) --}}
         @if($metaType)
             <span class="inline-flex items-center rounded px-1.5 py-0.5"
-                  style="background: {{ $bg($metaType['color']) }}; color: {{ $metaType['color'] }};">
-                {{ $metaType['name'] }}
+                  style="background: {{ $chipBg($metaType->color) }}; color: {{ $metaType->color }};">
+                {{ $metaType->name }}
             </span>
         @endif
     </div>

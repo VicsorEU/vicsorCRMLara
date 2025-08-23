@@ -6,59 +6,65 @@
 @section('content')
     @php
         use Illuminate\Support\Collection;
+        use App\Models\Settings\ProjectDepartment;
 
         $defaultColor = '#94a3b8';
 
-        // ===== 1) Нормализуем справочник отделов =====
-        $depMeta         = $depMeta         ?? null;
-        $orderedDepIds   = $orderedDepIds   ?? null;
-        $departments     = $departments     ?? [];
-        $depColors       = $depColors       ?? [];
+        /**
+         * 1) Справочник отделов из таксономии.
+         * Контроллер МОЖЕТ передать $deptIdToName / $deptIdToColor / $orderedDepIds,
+         * но если не передал — читаем из БД.
+         */
+        $deptIdToName  = $deptIdToName  ?? [];
+        $deptIdToColor = $deptIdToColor ?? [];
+        $orderedDepIds = $orderedDepIds ?? [];
 
-        if (!$depMeta) {
-            $depMeta = [];
-            foreach (($departments ?? []) as $i => $name) {
-                $id = $i + 1;
-                $depMeta[$id] = [
-                    'name'  => trim((string)$name),
-                    'color' => $depColors[$i] ?? $defaultColor,
-                ];
-            }
-        }
-        if (!$orderedDepIds) {
-            $orderedDepIds = array_keys($depMeta);
-        }
+        if (empty($deptIdToName) || empty($orderedDepIds)) {
+            $rows = ProjectDepartment::query()
+                ->orderBy('position')->orderBy('id')
+                ->get(['id','name','color']);
 
-        $depIdByName = [];
-        foreach ($depMeta as $id => $meta) {
-            $n = $meta['name'] ?? '';
-            if ($n !== '') $depIdByName[$n] = $id;
-        }
-
-        // ===== 2) Группы проектов по ID отдела =====
-        /** @var Collection|null $groupsById */
-        $groupsById = $groupsById ?? null;
-
-        if (!$groupsById instanceof Collection) {
-            $groupsById = collect();
-
-            foreach ($orderedDepIds as $depId) $groupsById->put($depId, collect());
-            $groupsById->put(0, collect());
-
-            if (isset($groups) && $groups instanceof Collection) {
-                // Старый формат: ключ = название отдела
-                foreach ($groups as $key => $rows) {
-                    $depId = is_numeric($key) ? (int)$key : ($depIdByName[$key] ?? 0);
-                    if (!$groupsById->has($depId)) $groupsById->put($depId, collect());
-                    $groupsById[$depId] = $rows;
+            // нормализация: #RGB -> #RRGGBB и дефолтный цвет
+            $normalizeHex = function (?string $c) use ($defaultColor) {
+                $c = trim((string)$c);
+                if (preg_match('/^#([0-9a-f]{3})$/i', $c, $m)) {
+                    $c = '#'.$m[1][0].$m[1][0].$m[1][1].$m[1][1].$m[1][2].$m[1][2];
                 }
-            } elseif (isset($projects)) {
-                // Есть paginator/коллекция проектов — раскидаем по отделам
-                foreach ($projects as $p) {
-                    $depId = (int)($p->department ?? 0);
-                    if (!$groupsById->has($depId)) $groupsById->put($depId, collect());
-                    $groupsById[$depId]->push($p);
+                if (!preg_match('/^#([0-9a-f]{6})$/i', $c)) {
+                    $c = $defaultColor;
                 }
+                return $c;
+            };
+
+            $deptIdToName  = $rows->pluck('name','id')->all();
+            $deptIdToColor = $rows->pluck('color','id')->map($normalizeHex)->all();
+            $orderedDepIds = array_values($rows->pluck('id')->all());
+        }
+
+        $hasDepartments = !empty($orderedDepIds);
+
+        /**
+         * 2) Группируем проекты по отделам.
+         * Любой проект с неизвестным/удалённым department попадает в группу 0 («Без отдела»).
+         */
+        /** @var Collection $groupsById */
+        $groupsById = collect();
+
+        // пустые группы для всех отделов + 0
+        foreach ($orderedDepIds as $depId) {
+            $groupsById->put((int)$depId, collect());
+        }
+        $groupsById->put(0, collect());
+
+        $validSet = array_flip(array_map('intval', $orderedDepIds));
+
+        if (isset($projects)) {
+            foreach (collect($projects) as $p) {
+                $depId = (int)($p->department ?? 0);
+                if (!isset($validSet[$depId])) {
+                    $depId = 0; // отдел удалён/неизвестен -> «Без отдела»
+                }
+                $groupsById[$depId]->push($p);
             }
         }
     @endphp
@@ -73,80 +79,75 @@
             </button>
         </div>
 
-        {{-- Секции по отделам в заданном порядке --}}
-        @forelse ($groups as $deptId => $list)
-            @if($deptId === 0) @continue @endif
+        @if ($hasDepartments)
+            {{-- Секции по отделам (в порядке таксономии) --}}
+            @foreach ($orderedDepIds as $deptId)
+                @php
+                    $name  = $deptIdToName[$deptId]  ?? '—';
+                    $color = $deptIdToColor[$deptId] ?? $defaultColor;
+                    $list  = $groupsById->get($deptId, collect());
+                @endphp
 
-            @php
-                $name  = $deptIdToName[$deptId]  ?? '—';
-                $color = $deptIdToColor[$deptId] ?? '#94a3b8';
-            @endphp
+                <div class="bg-white border rounded-2xl shadow-soft dept-block overflow-hidden">
+                    <div class="px-5 py-3 border-b flex items-center justify-between rounded-t-2xl"
+                         style="background: {{ $color }};">
+                        <div class="font-medium text-white">
+                            {{ $name }}
+                            <span class="text-white/80 font-normal">
+                                ( <span class="dept-counter">{{ $list->count() }}</span> )
+                            </span>
+                        </div>
+                    </div>
 
-            <div class="bg-white border rounded-2xl shadow-soft dept-block overflow-hidden">
-                <div class="px-5 py-3 border-b flex items-center justify-between rounded-t-2xl"
-                     style="background: {{ $color }};">
-                    <div class="font-medium text-white">
-                        {{ $name }}
-                        <span class="text-white/80 font-normal">
-                    ( <span class="dept-counter">{{ $list->count() }}</span> )
-                </span>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="text-left text-slate-500">
+                            <tr>
+                                <th class="py-3 px-4">Название</th>
+                                <th class="py-3 px-4">Ответственный</th>
+                                <th class="py-3 px-4">Старт</th>
+                                <th class="py-3 px-4">Стоп</th>
+                                <th class="py-3 px-4 w-32"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @forelse($list as $p)
+                                <tr class="border-t project-row" data-id="{{ $p->id }}">
+                                    <td class="py-3 px-4 font-medium">
+                                        <a class="hover:underline" href="{{ route('projects.show',$p) }}">{{ $p->name }}</a>
+                                    </td>
+                                    <td class="py-3 px-4">{{ $p->manager->name ?? '—' }}</td>
+                                    <td class="py-3 px-4">{{ $p->start_date?->format('d.m.Y') ?? '—' }}</td>
+                                    <td class="py-3 px-4">{{ $p->end_date?->format('d.m.Y') ?? '—' }}</td>
+                                    <td class="py-3 px-4 text-right">
+                                        <div class="flex items-center justify-end gap-3">
+                                            <a class="text-brand-600 hover:underline" href="{{ route('projects.show',$p) }}">Открыть</a>
+                                            <button @click="destroy({{ $p->id }}, $event)"
+                                                    class="text-red-600 hover:underline">Удалить</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr class="border-t" data-empty="1">
+                                    <td class="py-4 px-4 text-slate-500" colspan="5">В этом отделе пока нет проектов</td>
+                                </tr>
+                            @endforelse
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead class="text-left text-slate-500">
-                        <tr>
-                            <th class="py-3 px-4">Название</th>
-                            <th class="py-3 px-4">Ответственный</th>
-                            <th class="py-3 px-4">Старт</th>
-                            <th class="py-3 px-4">Стоп</th>
-                            <th class="py-3 px-4 w-32"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @forelse($list as $p)
-                            @php
-                                $dept = $depMeta[(int)($p->department ?? 0)] ?? null;
-                                $chip = $dept ? ($dept['name'] ?? '') : '';
-                                $chipColor = $dept['color'] ?? $defaultColor;
-                            @endphp
-                            <tr class="border-t project-row" data-id="{{ $p->id }}">
-                                <td class="py-3 px-4 font-medium">
-                                    <a class="hover:underline" href="{{ route('projects.show',$p) }}">{{ $p->name }}</a>
-
-                                </td>
-                                <td class="py-3 px-4">{{ $p->manager->name ?? '—' }}</td>
-                                <td class="py-3 px-4">{{ $p->start_date?->format('d.m.Y') ?? '—' }}</td>
-                                <td class="py-3 px-4">{{ $p->end_date?->format('d.m.Y') ?? '—' }}</td>
-                                <td class="py-3 px-4 text-right">
-                                    <div class="flex items-center justify-end gap-3">
-                                        <a class="text-brand-600 hover:underline" href="{{ route('projects.show',$p) }}">Открыть</a>
-                                        <button @click="destroy({{ $p->id }}, $event)"
-                                                class="text-red-600 hover:underline">Удалить</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr class="border-t" data-empty="1">
-                                <td class="py-4 px-4 text-slate-500" colspan="5">В этом отделе пока нет проектов</td>
-                            </tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @empty
+            @endforeach
+        @else
             <div class="bg-white border rounded-2xl shadow-soft p-6 text-slate-600">
                 Сначала добавьте отделы в
                 <a class="text-brand-600 hover:underline" href="{{ route('settings.index',['section'=>'projects']) }}">
                     настройках проектов
                 </a>.
             </div>
-        @endforelse
+        @endif
 
-        {{-- Блок «Без отдела» (ID = 0), если есть проекты без отдела --}}
-        @php $noDept = $groupsById[0] ?? collect(); @endphp
+        {{-- Блок «Без отдела» (ID = 0), если есть проекты без отдела или с удалённым отделом --}}
+        @php $noDept = $groupsById->get(0, collect()); @endphp
         @if ($noDept->isNotEmpty())
             <div class="bg-white border rounded-2xl shadow-soft dept-block">
                 <div class="px-5 py-3 border-b">
@@ -199,13 +200,12 @@
                     <div class="p-5 space-y-4">
                         <div>
                             <label class="block text-sm mb-1">Отдел</label>
-                            <select x-model="form.department" required class="w-full border rounded-lg px-3 py-2">
+                            <select x-model.number="form.department" required class="w-full border rounded-lg px-3 py-2">
                                 <option value="" disabled>— выберите отдел —</option>
                                 @foreach($deptIdToName as $id => $name)
                                     <option value="{{ $id }}">{{ $name }}</option>
                                 @endforeach
                             </select>
-
                         </div>
 
                         <div>
@@ -243,7 +243,7 @@
 
                     </div>
 
-                    <div class="px-5 py-4 border-t flex justify-end gap-2">
+                    <div class="px-5 py-4 border-т flex justify-end gap-2">
                         <button type="button" class="px-4 py-2 rounded-lg border" @click="openCreate=false">Отмена</button>
                         <button class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">Создать</button>
                     </div>
@@ -273,7 +273,7 @@
 
             return {
                 openCreate:false,
-                form:{ department:'', name:'', manager_id:'', start_date:'', end_date:'', note:'' },
+                form:{ department:null, name:'', manager_id:'', start_date:'', end_date:'', note:'' },
 
                 async create(){
                     if(!this.form.department){
@@ -320,11 +320,11 @@
 
                         if (tbody && tbody.querySelectorAll('tr.project-row').length === 0) {
                             tbody.innerHTML = `
-                        <tr class="border-t" data-empty="1">
-                            <td class="py-4 px-4 text-slate-500" colspan="5">
-                                В этом отделе пока нет проектов
-                            </td>
-                        </tr>`;
+                                <tr class="border-t" data-empty="1">
+                                    <td class="py-4 px-4 text-slate-500" colspan="5">
+                                        В этом отделе пока нет проектов
+                                    </td>
+                                </tr>`;
                         }
 
                         updateDeptCounter(block);

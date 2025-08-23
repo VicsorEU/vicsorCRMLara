@@ -18,26 +18,9 @@
 
     $baseTotalSec = (int)($task->total_seconds ?? 0);
 
-    $settings = \App\Models\AppSetting::get('projects', [
-            'types'            => [], 'types_ids'          => [],
-            'priorities'       => [], 'priorities_ids'     => [],
-        ]);
+    $taskTypes  = \DB::table('settings_project_task_types')->orderBy('position')->orderBy('id')->get();
+    $priorities = \DB::table('settings_project_task_priorities')->orderBy('position')->orderBy('id')->get();
 
-    // Типы задач: id => name
-        $taskTypeIdToName = [];
-        foreach (($settings['types'] ?? []) as $i => $name) {
-            $id = (int)($settings['types_ids'][$i] ?? 0);
-            $name = trim((string)$name);
-            if ($id > 0 && $name !== '') $taskTypeIdToName[$id] = $name;
-        }
-
-        // Важности: id => name
-        $priorityIdToName = [];
-        foreach (($settings['priorities'] ?? []) as $i => $name) {
-            $id = (int)($settings['priorities_ids'][$i] ?? 0);
-            $name = trim((string)$name);
-            if ($id > 0 && $name !== '') $priorityIdToName[$id] = $name;
-        }
 @endphp
 
 @section('content')
@@ -54,13 +37,14 @@
 
                 <div>
                     <label class="block text-sm mb-1">Тип задачи</label>
-                    <select name="type" class="w-full border rounded-lg px-3 py-2">
+                    <select name="type_id" class="w-full border rounded-lg px-3 py-2">
                         <option value="">— выберите тип —</option>
-                        @foreach($taskTypeIdToName as $id => $name)
-                            <option value="{{ $id }}" @selected((int)old('type', $task->type) === $id)>{{ $name }}</option>
+                        @foreach($taskTypes as $t)
+                            <option value="{{ $t->id }}" @selected((int)old('type_id',$task->type_id) === (int)$t->id)>{{ $t->name }}</option>
                         @endforeach
                     </select>
                 </div>
+                @include('tasks._labels_grades', ['task' => $task])
 
                 <div>
                     <label class="block text-sm mb-1">Дата начала</label>
@@ -74,10 +58,10 @@
 
                 <div>
                     <label class="block text-sm mb-1">Степень важности</label>
-                    <select name="priority" class="w-full border rounded-lg px-3 py-2">
+                    <select name="priority_id" class="w-full border rounded-lg px-3 py-2">
                         <option value="">— выберите важность —</option>
-                        @foreach($priorityIdToName as $id => $name)
-                            <option value="{{ $id }}" @selected((int)old('priority', $task->priority) === $id)>{{ $name }}</option>
+                        @foreach($priorities as $p)
+                            <option value="{{ $p->id }}" @selected((int)old('priority_id',$task->priority_id) === (int)$p->id)>{{ $p->name }}</option>
                         @endforeach
                     </select>
                 </div>

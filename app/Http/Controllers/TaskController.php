@@ -23,8 +23,8 @@ class TaskController extends Controller
             'details'     => ['nullable','string'],
             'due_at'      => ['nullable','date'],
             'due_to'      => ['nullable','date'],
-            'priority'    => ['nullable','integer','min:1'],
-            'type'        => ['nullable','integer','min:1'],
+            'priority_id'    => ['nullable','integer','min:1'],
+            'type_id'        => ['nullable','integer','min:1'],
             'assignee_id' => ['nullable','integer'],
             'steps'       => ['nullable'],              // может прийти строкой JSON
             'draft_token' => ['nullable','string','max:100'],
@@ -118,8 +118,8 @@ class TaskController extends Controller
     {
         $data = $request->validate([
             'title'       => ['required','string','max:255'],
-            'priority'    => ['nullable','integer','min:1'],
-            'type'        => ['nullable','integer','min:1'],
+            'priority_id'    => ['nullable','integer','min:1'],
+            'type_id'     => ['nullable','integer','min:1'],
             'assignee_id' => ['nullable','exists:users,id'],
             'details'     => ['nullable','string'],
             'due_at'      => ['nullable','date'],

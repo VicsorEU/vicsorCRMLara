@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Concerns\Auditable;
+use App\Models\Settings\ProjectTaskType;
+use App\Models\Settings\ProjectTaskPriority;
+use App\Models\Settings\ProjectRandlabel;
+use App\Models\Settings\ProjectGrade;
 
 
 class Task extends Model
@@ -17,16 +21,16 @@ class Task extends Model
     use HasFactory;
 
     protected $fillable = [
-        'board_id','column_id','title','details','due_at','due_to',
-        'priority','type','assignee_id','steps',
+        'board_id','column_id','title','details',
+        'due_at','due_to','assignee_id','card_order',
+        'steps','type_id','priority_id',
     ];
 
     protected $casts = [
         'steps'  => 'array',
         'due_at' => 'datetime',
         'due_to' => 'datetime',
-        'type' => 'integer',
-        'priority' => 'integer',
+        'grade_id' => 'integer',
     ];
 
     protected static function booted(): void
@@ -72,6 +76,48 @@ class Task extends Model
     public function activeTimer()
     {
         return $this->timers()->whereNull('stopped_at')->latest('id');
+    }
+
+    public function typeRef()
+    {
+        return $this->belongsTo(ProjectTaskType::class, 'type_id');
+    }
+
+    public function priorityRef()
+    {
+        return $this->belongsTo(ProjectTaskPriority::class, 'priority_id');
+    }
+
+    public function getTypeLabelAttribute(): ?string
+    {
+        return optional($this->typeRef)->name;
+    }
+    public function getTypeColorAttribute(): ?string
+    {
+        return optional($this->typeRef)->color;
+    }
+    public function getPriorityLabelAttribute(): ?string
+    {
+        return optional($this->priorityRef)->name;
+    }
+    public function getPriorityColorAttribute(): ?string
+    {
+        return optional($this->priorityRef)->color;
+    }
+
+    public function randlables()
+    {
+        return $this->belongsToMany(
+            ProjectRandlabel::class,
+            'task_randlables',
+            'task_id',
+            'randlable_id'
+        )->withTimestamps();
+    }
+
+    public function grade()
+    {
+        return $this->belongsTo(ProjectGrade::class, 'grade_id');
     }
 
 }

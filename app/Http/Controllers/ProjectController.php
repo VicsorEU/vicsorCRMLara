@@ -9,55 +9,18 @@ use App\Models\AppSetting;
 
 class ProjectController extends Controller
 {
+    // ProjectsController@index
     public function index()
     {
-        // Настройки
-        $settings = AppSetting::get('projects', [
-            'departments'         => [],
-            'departments_colors'  => [],
-            // если заведёшь устойчивые ID — добавь сюда 'departments_ids' => []
-        ]);
+        $projects = \App\Models\Project::with('manager')->get();
 
-        $names  = array_values($settings['departments'] ?? []);
-        $colors = array_values($settings['departments_colors'] ?? []);
+        // Справочник отделов (можешь получать так, как у тебя сделано)
+        $rows = \App\Models\Settings\ProjectDepartment::orderBy('position')->orderBy('id')->get();
+        $deptIdToName  = $rows->pluck('name','id')->all();
+        $deptIdToColor = $rows->pluck('color','id')->all();
+        $orderedDepIds = array_values($rows->pluck('id')->all());
 
-        // Карты id->name / id->color (id = i+1)
-        $deptIdToName  = [];
-        $deptIdToColor = [];
-        $DEF = '#94a3b8';
-
-        foreach ($names as $i => $name) {
-            $id = $i + 1;
-            $deptIdToName[$id]  = trim((string)$name);
-            $deptIdToColor[$id] = $colors[$i] ?? $DEF;
-        }
-
-        // Проекты
-        $projects = Project::with('manager')->orderByDesc('id')->paginate(20);
-        $users    = User::orderBy('name')->get();
-
-        // Группы: по id + специальная группа 0 = "Без отдела"
-        $groups = collect();
-        foreach (array_keys($deptIdToName) as $id) {
-            $groups->put($id, collect());
-        }
-        $groups->put(0, collect());
-
-        foreach ($projects as $p) {
-            $id = (int) $p->department;
-            if ($id && isset($deptIdToName[$id])) {
-                $groups[$id]->push($p);
-            } else {
-                $groups[0]->push($p);
-            }
-        }
-
-        return view('projects.index', [
-            'groups'        => $groups,
-            'deptIdToName'  => $deptIdToName,
-            'deptIdToColor' => $deptIdToColor,
-            'users'         => $users,
-        ]);
+        return view('projects.index', compact('projects','deptIdToName','deptIdToColor','orderedDepIds'));
     }
 
 
@@ -106,20 +69,20 @@ class ProjectController extends Controller
 
     public function update(Request $r, Project $project)
     {
-        $departments = AppSetting::get('projects', ['departments'=>[]])['departments'] ?? [];
-
         $data = $r->validate([
-            'name'       => 'required|string|max:255',
-            'manager_id' => 'nullable|exists:users,id',
-            'start_date' => 'nullable|date',
-            'end_date'    => 'nullable|date',
-            'note'       => 'nullable|string',
-            'department' => ['nullable','integer'],
-
+            'name'          => ['required','string','max:255'],
+            'start_date'    => ['nullable','date'],
+            'end_date'      => ['nullable','date','after_or_equal:start_date'],
+            'manager_id'    => ['nullable','exists:users,id'],
+            'note'          => ['nullable','string'],
+            'department'    => ['nullable','integer','exists:settings_project_departments,id'],
         ]);
-        $project->update($data);
 
-        return response()->json(['ok'=>true]);
+        $project->fill($data)->save();
+
+        return $r->wantsJson()
+            ? response()->json(['message'=>'ok'])
+            : back()->with('ok','Сохранено');
     }
 
     public function destroy(Request $r, Project $project)

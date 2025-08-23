@@ -5,38 +5,15 @@
 
 @section('content')
     @php
-        $settings = \App\Models\AppSetting::get('projects', [
-            'departments'      => [], 'departments_ids'    => [],
-            'types'            => [], 'types_ids'          => [],
-            'priorities'       => [], 'priorities_ids'     => [],
-        ]);
+        // Берём справочники из таблиц таксономий (ID → Name)
+        $departments   = \App\Models\Settings\ProjectDepartment::query()->orderBy('position')->get(['id','name']);
+        $taskTypes     = \App\Models\Settings\ProjectTaskType::query()->orderBy('position')->get(['id','name']);
+        $priorities    = \App\Models\Settings\ProjectTaskPriority::query()->orderBy('position')->get(['id','name']);
 
-        // Отделы: id => name (если нужно)
-        $deptIdToName = [];
-        foreach (($settings['departments'] ?? []) as $i => $name) {
-            $id = (int)($settings['departments_ids'][$i] ?? 0);
-            $name = trim((string)$name);
-            if ($id > 0 && $name !== '') $deptIdToName[$id] = $name;
-        }
-
-        // Типы задач: id => name
-        $taskTypeIdToName = [];
-        foreach (($settings['types'] ?? []) as $i => $name) {
-            $id = (int)($settings['types_ids'][$i] ?? 0);
-            $name = trim((string)$name);
-            if ($id > 0 && $name !== '') $taskTypeIdToName[$id] = $name;
-        }
-
-        // Важности: id => name
-        $priorityIdToName = [];
-        foreach (($settings['priorities'] ?? []) as $i => $name) {
-            $id = (int)($settings['priorities_ids'][$i] ?? 0);
-            $name = trim((string)$name);
-            if ($id > 0 && $name !== '') $priorityIdToName[$id] = $name;
-        }
+        $deptIdToName        = $departments->pluck('name','id')->all();
+        $taskTypeIdToName    = $taskTypes->pluck('name','id')->all();
+        $priorityIdToName    = $priorities->pluck('name','id')->all();
     @endphp
-
-
 
     <style>
         [x-cloak]{display:none!important}
@@ -75,29 +52,26 @@
                             <input type="date" x-model="p.end_date" class="w-full border rounded-lg px-3 py-2">
                         </div>
 
-
                         <div>
                             <label class="block text-sm mb-1">Ответственный</label>
-                            <select x-model="p.manager_id" class="w-full border rounded-lg px-3 py-2">
+                            <select x-model.number="p.manager_id" class="w-full border rounded-lg px-3 py-2">
                                 <option value="">—</option>
                                 @foreach($users as $u)
-                                    <option value="{{ $u->id }}" @selected($project->manager_id===$u->id)>{{ $u->name }}</option>
+                                    <option value="{{ $u->id }}">{{ $u->name }}</option>
                                 @endforeach
                             </select>
                         </div>
 
-                        {{-- НОВОЕ: Отдел --}}
+                        {{-- Отдел --}}
                         <div>
                             <label class="block text-sm mb-1">Отдел</label>
                             @if(count($deptIdToName))
-                                <?php print_r($project->department); ?>
                                 <select x-model.number="p.department" class="w-full border rounded-lg px-3 py-2">
                                     <option value="">— выберите отдел —</option>
                                     @foreach($deptIdToName as $id => $name)
-                                        <option value="{{ $id }}" @selected($project->department===$id)>{{ $name }}</option>
+                                        <option value="{{ $id }}">{{ $name }}</option>
                                     @endforeach
                                 </select>
-
                                 <div class="text-xs text-slate-500 mt-1">
                                     Список отделов настраивается в “Настройки → Проекты”.
                                 </div>
@@ -110,17 +84,14 @@
                             @endif
                         </div>
 
-
                         <div class="md:col-span-3">
                             @include('shared.rte', [
-                                    'model' => 'p',
-                                    'field' => 'note',
-                                    'users' => $users->map(fn($u)=>['id'=>$u->id,'name'=>$u->name])->values(),
-                                    'placeholder' => 'Введите заметку…',
-                                ])
+                                'model' => 'p',
+                                'field' => 'note',
+                                'users' => $users->map(fn($u)=>['id'=>$u->id,'name'=>$u->name])->values(),
+                                'placeholder' => 'Введите заметку…',
+                            ])
                         </div>
-
-
 
                         <div class="md:col-span-3 flex justify-end gap-2">
                             <button @click="saveProject" class="px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700">
@@ -131,7 +102,6 @@
                 </div>
             </div>
         </div>
-
 
         {{-- Канбан --}}
         <div class="bg-white border rounded-2xl shadow-soft">
@@ -180,7 +150,7 @@
             </div>
         </div>
 
-        {{-- Модал: Новая задача + Файлы (batch) + Этапы --}}
+        {{-- Модал: Новая задача + Файлы + Этапы --}}
         <div x-show="taskModalOpen" x-cloak class="fixed inset-0 z-[9999]" @keydown.escape.window="closeTaskModal()">
             <div class="fixed inset-0 bg-black/60 backdrop-blur-[1px]" @click="closeTaskModal()"></div>
 
@@ -201,7 +171,7 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-sm mb-1">Ответственный</label>
-                                <select x-model="taskForm.assignee_id" class="w-full border rounded-lg px-3 py-2">
+                                <select x-model.number="taskForm.assignee_id" class="w-full border rounded-lg px-3 py-2">
                                     <option value="">—</option>
                                     @foreach($users as $u)
                                         <option value="{{ $u->id }}">{{ $u->name }}</option>
@@ -215,7 +185,6 @@
                                 <label class="block text-sm mb-1">Дата начала</label>
                                 <input type="date" x-model="taskForm.due_at" class="w-full border rounded-lg px-3 py-2">
                             </div>
-
                             <div>
                                 <label class="block text-sm mb-1">Дата окончания</label>
                                 <input type="date" x-model="taskForm.due_to" class="w-full border rounded-lg px-3 py-2">
@@ -225,26 +194,23 @@
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-sm mb-1">Тип задачи</label>
-                                <select x-model.number="taskForm.type" class="w-full border rounded-lg px-3 py-2">
+                                <select x-model.number="taskForm.type_id" class="w-full border rounded-lg px-3 py-2">
                                     <option value="">— выберите тип —</option>
                                     @foreach($taskTypeIdToName as $id => $name)
                                         <option value="{{ $id }}">{{ $name }}</option>
                                     @endforeach
                                 </select>
-
                             </div>
 
                             <div>
                                 <label class="block text-sm mb-1">Важность</label>
-                                <select x-model.number="taskForm.priority" class="w-full border rounded-lg px-3 py-2">
+                                <select x-model.number="taskForm.priority_id" class="w-full border rounded-lg px-3 py-2">
                                     <option value="">— выберите важность —</option>
                                     @foreach($priorityIdToName as $id => $name)
                                         <option value="{{ $id }}">{{ $name }}</option>
                                     @endforeach
                                 </select>
-
                             </div>
-
                         </div>
 
                         <div x-ref="rteTaskDetails">
@@ -270,7 +236,6 @@
                                         <input class="flex-1 border rounded-lg px-3 py-2"
                                                :placeholder="`Шаг ${idx+1}`"
                                                x-model="steps[idx].text">
-
                                         <button type="button" class="px-2 py-1 text-slate-500 hover:text-red-600"
                                                 @click="steps.splice(idx,1)">✕</button>
                                     </li>
@@ -323,7 +288,6 @@
 
     <script>
         function projectPage(){
-
             const headersJson = {
                 'Accept':'application/json',
                 'Content-Type':'application/json',
@@ -345,9 +309,10 @@
                     name: @json($project->name),
                     start_date: @json(optional($project->start_date)->format('Y-m-d')),
                     end_date:   @json(optional($project->end_date)->format('Y-m-d')),
-                    manager_id: @json($project->manager_id),
+                    manager_id: @json($project->manager_id === null ? null : (int)$project->manager_id),
                     note: @json($project->note),
-                    department: @json($project->department),
+                    // КЛЮЧЕВОЕ: приводим к числу, иначе x-model.number не совпадёт со string value
+                    department: @json($project->department === null ? null : (int)$project->department),
                 },
                 newCol:{ name:'', color:'#94a3b8' },
 
@@ -360,9 +325,10 @@
                     details:'',
                     due_at:'',
                     due_to:'',
-                    priority:'',
-                    type:'',
-                    assignee_id:'',
+                    // КЛЮЧЕВОЕ: для валидации (nullable|integer) отправляем null или число
+                    priority: null,
+                    type: null,
+                    assignee_id: null,
                     draft_token:'',
                 },
                 steps: [],              // [{text,done}]
@@ -419,9 +385,14 @@
                         // взять HTML из редактора заметки
                         this.p.note = this.readRte('rteProjectNote', this.p.note);
 
+                        const payload = { ...this.p };
+                        // пустые строки → null (на всякий случай)
+                        if (payload.manager_id === '') payload.manager_id = null;
+                        if (payload.department === '') payload.department = null;
+
                         const r = await fetch('{{ route('projects.update',$project) }}', {
                             method:'PATCH', headers:headersJson, credentials:'same-origin',
-                            body: JSON.stringify(this.p)
+                            body: JSON.stringify(payload)
                         });
                         if(!r.ok) throw new Error(await r.text());
                         toast('Проект сохранён');
@@ -529,7 +500,8 @@
                 openTaskModal(columnId){
                     this.taskForm = {
                         board_id: boardId, column_id: columnId, title:'', details:'',
-                        due_at:'', due_to:'', priority:'', type:'', assignee_id:'',
+                        due_at:'', due_to:'',
+                        priority: null, type: null, assignee_id: null,
                         draft_token: self.crypto?.randomUUID?.() ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2))
                     };
                     this.steps = [];
@@ -581,12 +553,11 @@
                 async removeUploaded(idx, id){
                     if (!id) { this.uploaded.splice(idx, 1); return; }
 
-                    // URL с правильным именем параметра {attachment}
                     const url = @json(route('task-files.destroyDraft', ':attachment')).replace(':attachment', id);
 
                     try{
                         const fd = new FormData();
-                        fd.append('_method', 'DELETE'); // метод-спуфинг для Laravel
+                        fd.append('_method', 'DELETE');
 
                         const res = await fetch(url, {
                             method: 'POST',
@@ -600,7 +571,7 @@
                         });
 
                         if (!res.ok) {
-                            const txt = await res.text().catch(()=>'');
+                            const txt = await res.text().catch(()=>{});
                             console.error('delete failed', res.status, txt);
                             window.toast?.(res.status === 403 ? 'Нет прав на удаление файла' : 'Не удалось удалить файл');
                             return;
@@ -613,8 +584,6 @@
                         window.toast?.('Ошибка сети');
                     }
                 },
-
-
 
                 humanSize(bytes){
                     if(!bytes && bytes !== 0) return '';
@@ -635,7 +604,6 @@
                     if (!root) return fallback || '';
                     const ed = root.querySelector('[contenteditable]');
                     const val = ed ? ed.innerHTML : '';
-                    // иногда miniRTE может засунуть DOM-узел в модель и получить "[object HTMLInputElement]"
                     if (val && val !== '[object HTMLInputElement]') return val;
                     return fallback || '';
                 },
@@ -653,6 +621,11 @@
                         steps: this.steps
                     };
 
+                    // нормализуем пустые в null
+                    if (payload.priority === '' || Number.isNaN(payload.priority)) payload.priority = null;
+                    if (payload.type === '' || Number.isNaN(payload.type)) payload.type = null;
+                    if (payload.assignee_id === '' || Number.isNaN(payload.assignee_id)) payload.assignee_id = null;
+
                     const colEl = document.querySelector(`.kanban-column[data-column="${this.taskForm.column_id}"]`);
                     if (!colEl) { toast('Колонка не найдена'); return; }
 
@@ -667,10 +640,7 @@
                             throw new Error(data?.message || 'Ошибка сохранения');
                         }
 
-                        // 1) Если бэкенд вернул готовый html — используем его
                         let html = data?.html;
-
-                        // 2) Иначе — строим минимальную карточку сами
                         if(!html){
                             const id = data?.id;
                             const title = this.escapeHtml(this.taskForm.title || ('Задача #'+id));
@@ -685,8 +655,6 @@
                         }
 
                         colEl.insertAdjacentHTML('beforeend', html);
-
-                        // Закрываем модалку и показываем тост
                         this.closeTaskModal();
                         toast('Задача добавлена');
 

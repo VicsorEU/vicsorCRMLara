@@ -17,6 +17,10 @@ use App\Http\Controllers\{
     TimerController, TaskFileController, TaskCommentController
 };
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\Settings\ProjectTaxonomyController;
+use App\Http\Controllers\Tasks\TaskTaxonomyController;
+
+
 
 
 Route::middleware('guest')->group(function () {
@@ -105,5 +109,16 @@ Route::middleware('auth')->group(function () {
         ->name('settings.logo.delete');
 
     Route::post('/settings/projects/save', [SettingsController::class, 'saveProjects'])->name('settings.projects.save');
+
+    Route::prefix('settings/projects')->middleware(['auth'])->group(function () {
+        Route::post('/taxonomy/{group}', [ProjectTaxonomyController::class, 'save'])
+            ->name('settings.projects.taxonomy.save');
+    });
+
+
+    Route::middleware(['auth'])->group(function () {
+        Route::post('/tasks/{task}/taxonomy/sync', [TaskTaxonomyController::class, 'sync'])
+            ->name('tasks.taxonomy.sync');
+    });
 
 });

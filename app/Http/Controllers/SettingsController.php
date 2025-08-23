@@ -28,67 +28,16 @@ class SettingsController extends Controller
         }
 
         if ($section === 'projects') {
-            // дефолтные ключи + colors + ids для ВСЕХ групп
-            $defaults = [
-                'departments'        => [], 'departments_colors'  => [], 'departments_ids'  => [],
-                'types'              => [], 'types_colors'        => [], 'types_ids'        => [],
-                'priorities'         => [], 'priorities_colors'   => [], 'priorities_ids'   => [],
-                'randlables'         => [], 'randlables_colors'   => [], 'randlables_ids'   => [],
-                'grades'             => [], 'grades_colors'       => [], 'grades_ids'       => [],
+            $projects = [
+                'departments' => DB::table('settings_project_departments')->orderBy('position')->orderBy('id')->get(),
+                'types'       => DB::table('settings_project_task_types')->orderBy('position')->orderBy('id')->get(),
+                'priorities'  => DB::table('settings_project_task_priorities')->orderBy('position')->orderBy('id')->get(),
+                'randlables'  => DB::table('settings_project_randlables')->orderBy('position')->orderBy('id')->get(),
+                'grades'      => DB::table('settings_project_grades')->orderBy('position')->orderBy('id')->get(),
             ];
-            $projects = AppSetting::get('projects', $defaults);
-
-            $DEF = '#94a3b8';
-            $groups = ['departments','types','priorities','randlables','grades'];
-
-            // Нормализация для отображения формы: выровнять длины и подставить дефолтные цвета/ID
-            foreach ($groups as $g) {
-                $ck = $g.'_colors';
-                $ik = $g.'_ids';
-
-                // имена
-                $names = array_values(array_filter(
-                    array_map(fn($v)=>trim((string)$v), $projects[$g] ?? []),
-                    fn($v)=>$v!==''
-                ));
-
-                // цвета
-                $inColors = is_array($projects[$ck] ?? null) ? $projects[$ck] : [];
-                $colors = [];
-                foreach ($names as $i => $_) {
-                    $c = $inColors[$i] ?? $DEF;
-                    $colors[$i] = preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', (string)$c) ? $c : $DEF;
-                }
-
-                // id
-                $inIds = is_array($projects[$ik] ?? null) ? $projects[$ik] : [];
-                $used  = [];
-                foreach ($inIds as $x) {
-                    $n = (int)$x;
-                    if ($n > 0) $used[$n] = true;
-                }
-                $next = empty($used) ? 0 : max(array_keys($used));
-                $ids = [];
-                for ($i=0; $i<count($names); $i++) {
-                    $cand = (int)($inIds[$i] ?? 0);
-                    if ($cand > 0 && !isset($ids[$i])) {
-                        $ids[$i] = $cand;
-                        $used[$cand] = true;
-                    } else {
-                        // выдаём новый уникальный id
-                        do { $cand = ++$next; } while(isset($used[$cand]));
-                        $ids[$i] = $cand;
-                        $used[$cand] = true;
-                    }
-                }
-
-                $projects[$g]    = $names;
-                $projects[$ck]   = $colors;
-                $projects[$ik]   = $ids;
-            }
-
             return view('settings.index', compact('section','projects'));
         }
+
 
         return view('settings.index', compact('section'));
     }
