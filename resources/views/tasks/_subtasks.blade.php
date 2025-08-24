@@ -45,16 +45,7 @@
                             <span x-text="st.completed ? 'Завершена' : 'В работе'"></span>
                         </span>
 
-                        <div class="ml-auto flex items-center gap-2 text-sm">
-                            <span class="text-slate-500">Таймер:</span>
-                            <span x-text="timerText(st)"></span>
-                            <template x-if="!st.running_started_at">
-                                <button type="button" class="px-2 py-1 border rounded" @click="timerStart(st)">▶</button>
-                            </template>
-                            <template x-if="st.running_started_at">
-                                <button type="button" class="px-2 py-1 border rounded" @click="timerStop(st)">■</button>
-                            </template>
-                        </div>
+
                     </div>
 
                     <div class="text-sm text-slate-600 flex flex-wrap gap-x-6 gap-y-1">
@@ -123,17 +114,26 @@
                     </div>
 
                     <div class="md:col-span-2">
-                        <label class="block text-sm mb-1">Таймер</label>
-                        <div class="flex items-center gap-2">
-                            <div class="text-sm text-slate-600" x-text="timerText(stForm)"></div>
-                            <template x-if="!stForm.running_started_at">
-                                <button type="button" class="px-2 py-1 border rounded" @click="timerStart(stForm)">▶ Старт</button>
+                        @foreach($task->subtasks as $sub)
+                            <template x-if="isEdit && Number(stForm.id) === {{ $sub->id }}">
+                                <div class="space-y-3">
+                                    @include('shared.time_button', [
+                                        'taskId'    => $task->id,
+                                        'subtaskId' => $sub->id,
+                                        'title'     => $sub->title,
+                                    ])
+
+                                    @include('shared.time_table', [
+                                        'entity'           => 'subtask',
+                                        'entityId'         => $sub->id,
+                                        'userName'         => auth()->user()->name,
+                                        'deleteUrlPattern' => route('time.destroy', ':id'),
+                                    ])
+                                </div>
                             </template>
-                            <template x-if="stForm.running_started_at">
-                                <button type="button" class="px-2 py-1 border rounded" @click="timerStop(stForm)">■ Стоп</button>
-                            </template>
-                        </div>
+                        @endforeach
                     </div>
+
 
                     <div class="md:col-span-2">
                         @include('shared.rte', [

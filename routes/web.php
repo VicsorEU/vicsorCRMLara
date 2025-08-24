@@ -159,6 +159,8 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Settings\ProjectTaxonomyController;
 use App\Http\Controllers\Tasks\TaskTaxonomyController;
 use App\Http\Controllers\SubtaskController;
+use App\Http\Controllers\WorkTimerController;
+
 
 
 /*
@@ -279,6 +281,17 @@ Route::middleware('auth')->group(function () {
 
     Route::post  ('/subtasks/{subtask}/timer/start',   [SubtaskController::class,'timerStart'])->whereNumber('subtask')->name('subtasks.timer.start');
     Route::post  ('/subtasks/{subtask}/timer/stop',    [SubtaskController::class,'timerStop'])->whereNumber('subtask')->name('subtasks.timer.stop');
+
+    // Глобальные таймеры
+    Route::get ('/time/active',   [WorkTimerController::class, 'active'])->name('time.active');
+    Route::post('/time/start',    [WorkTimerController::class, 'start'])->name('time.start');
+    Route::post('/time/stop',     [WorkTimerController::class, 'stop'])->name('time.stop');
+
+    Route::post('/time',          [WorkTimerController::class, 'store'])->name('time.store');   // ручное добавление
+    Route::get ('/time',          [WorkTimerController::class, 'index'])->name('time.index');   // список по task/subtask
+    Route::delete('/time/{timer}',[WorkTimerController::class, 'destroy'])->whereNumber('timer')->name('time.destroy');
+
+    Route::get ('/time/summary',  [WorkTimerController::class, 'summary'])->name('time.summary');
 
     // Служебные маршруты таймера и файлов (не привязаны к {task})
     Route::get('/timer/active', [TimerController::class, 'active'])->name('kanban.timer.active');

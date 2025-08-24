@@ -188,19 +188,6 @@
                         </div>
                         <input type="hidden" name="details" x-model="taskForm.details">
 
-
-                        <div class="md:col-span-3 flex items-center gap-2">
-                            <button type="button" id="btnTimerStart" class="px-3 py-2 rounded-lg border">▶ Старт таймера
-                            </button>
-                            <button type="button" id="btnTimerStop" class="px-3 py-2 rounded-lg border">■ Стоп</button>
-
-                            <div class="ms-auto text-sm text-slate-600">
-                                Всего по задаче:
-                                <strong id="totalTimeText">
-                                    {{ sprintf('%02d:%02d:%02d', intdiv($baseTotalSec,3600), intdiv($baseTotalSec%3600,60), $baseTotalSec%60) }}
-                                </strong>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="px-5 py-4 border-t flex items-center justify-end gap-2">
@@ -313,68 +300,19 @@
                     'priorities' => $priorities,
                 ])
 
-
                 {{-- Учёт времени --}}
                 <div class="bg-white border rounded-2xl shadow-soft">
                     <div class="px-5 py-3 border-б font-medium">Учёт времени</div>
                     <div class="p-5 overflow-x-auto">
-                        <table class="min-w-full text-sm">
-                            <thead class="text-left text-slate-500">
-                            <tr>
-                                <th class="py-2 pr-4">Пользователь</th>
-                                <th class="py-2 pr-4">Начало</th>
-                                <th class="py-2 pr-4">Конец</th>
-                                <th class="py-2 pr-4">Длительность</th>
-                                <th class="py-2">Действия</th>
-                            </tr>
-                            </thead>
-                            <tbody id="timersBody">
-                            @foreach($task->timers as $t)
-                                @php $d = (int)($t->duration_sec ?? 0); @endphp
+                        @include('shared.time_button', ['taskId' => $task->id, 'title' => $task->title])
 
-                                <tr class="border-t {{ $t->stopped_at ? '' : 'running-row' }}"
-                                    data-id="{{ $t->id }}"
-                                    data-started="{{ optional($t->started_at)->toIso8601String() }}"
-                                    data-stopped="{{ optional($t->stopped_at)->toIso8601String() }}">
-                                    <td class="py-2 pr-4">{{ $t->user->name ?? ('Пользователь #'.$t->user_id) }}</td>
-                                    <td class="py-2 pr-4">
-                                        {{ $t->started_at ? $t->started_at->copy()->timezone($tz)->format('Y-m-d H:i:s') : '—' }}
-                                    </td>
-                                    <td class="py-2 pr-4">
-                                        {{ $t->stopped_at ? $t->stopped_at->copy()->timezone($tz)->format('Y-m-d H:i:s') : '—' }}
-                                    </td>
-                                    <td class="py-2">{{ $d ? sprintf('%02d:%02d:%02d', intdiv($d,3600), intdiv($d%3600,60), $d%60) : 'идёт...' }}</td>
-                                    <td class="py-2 timer-actions">
-                                        @if($t->stopped_at)
-                                            <button type="button" class="px-2 py-1 border rounded timer-del">Удалить
-                                            </button>
-                                        @else
-                                            <span class="text-slate-400">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-
-                        {{-- Ручное добавление интервала --}}
-                        <form id="manualTimerForm" class="mt-4 flex flex-wrap items-end gap-2" method="post"
-                              action="{{ route('kanban.timer.stop',$task) }}">
-                            @csrf
-                            <input type="hidden" name="manual" value="1">
-                            <input type="hidden" name="tz_offset" id="tzOffset" value="">
-                            <div>
-                                <label class="block text-sm mb-1">Начало</label>
-                                <input id="manualStart" type="datetime-local" name="started_at"
-                                       class="border rounded-lg px-3 py-2" required>
-                            </div>
-                            <div>
-                                <label class="block text-sm mb-1">Конец</label>
-                                <input id="manualStop" type="datetime-local" name="stopped_at"
-                                       class="border rounded-lg px-3 py-2" required>
-                            </div>
-                            <button type="submit" class="px-3 py-2 rounded-lg border">Добавить</button>
-                        </form>
+                        @include('shared.time_table', [
+                            'entity'   => 'task',
+                            'entityId' => $task->id,
+                            // 'entries' => $timeEntries, // можно не передавать
+                            'userName' => auth()->user()->name,
+                            'deleteUrlPattern' => route('time.destroy', ':id'),
+                        ])
                     </div>
                 </div>
             </div>
@@ -603,17 +541,6 @@
                     const timersBody = document.getElementById('timersBody');
                     let activeRow = null;
 
-                    function tick() {
-                        let total = baseTotal;
-                        if (activeStartMs) {
-                            const live = Math.floor((Date.now() - activeStartMs) / 1000);
-                            total += Math.max(0, live);
-                        }
-                        totalEl.textContent = fmtHMS(total);
-                    }
-
-                    setInterval(tick, 1000);
-                    tick();
 
                     // --- инициализация из DOM (если сервер уже отрендерил «идёт…») ---
                     function initFromDom() {
@@ -624,7 +551,6 @@
                         const ms = parseTs(ds);
                         if (!isNaN(ms)) {
                             activeStartMs = ms;
-                            tick();
                         }
                     }
 
@@ -692,7 +618,6 @@
                         baseTotal += dur;
                         activeRow = null;
                         activeStartMs = null;
-                        tick();
                     }
 
                     // --- синхронизация с сервером ---
@@ -718,7 +643,6 @@
                             } else {
                                 if (!activeStartMs) initFromDom();
                             }
-                            tick();
                         } catch (e) {
                             console.warn(e);
                         }
@@ -827,259 +751,7 @@
                         }
                     });
 
-                    // ---------- таймеры: старт/стоп ----------
-                    const timersUserName = @json(auth()->user()->name);
 
-                    document.getElementById('btnTimerStart').addEventListener('click', async () => {
-                        try {
-                            const r = await fetch(startUrl, {
-                                method: 'POST',
-                                headers: {'X-CSRF-TOKEN': csrf, 'Accept': 'application/json'},
-                                credentials: 'same-origin'
-                            });
-                            if (!r.ok) {
-                                toast('Не удалось запустить');
-                                return;
-                            }
-                            let data = {};
-                            try {
-                                data = await r.json();
-                            } catch (e) {
-                            }
-                            const started = data?.timer?.started_at || data?.started_at || new Date().toISOString();
-                            const user = data?.timer?.user?.name || timersUserName;
-                            const timerId = data?.timer?.id || data?.id || null;
-
-                            const ms = parseTs(started);
-                            if (!isNaN(ms)) {
-                                activeStartMs = ms;
-                                ensureActiveRow(user, started, timerId);
-                                tick();
-                            }
-                            toast('Таймер запущен');
-
-                            window.dispatchEvent(new CustomEvent('timer:started', {
-                                detail: {
-                                    task_id: @json($task->id),
-                                    started_at: started,
-                                    id: timerId || null,
-                                    title: document.querySelector('input[name="title"]')?.value || 'Таймер'
-                                }
-                            }));
-                        } catch (e) {
-                            console.error(e);
-                            toast('Ошибка сети');
-                        }
-                    });
-
-                    async function stopNow() {
-                        try {
-                            const hasRunningDom = !!document.querySelector('#timersBody tr.running-row');
-                            if (!activeStartMs && !hasRunningDom) {
-                                toast('Таймер не запущен');
-                                return;
-                            }
-
-                            const r = await fetch(stopUrl, {
-                                method: 'POST',
-                                headers: {'X-CSRF-TOKEN': csrf, 'Accept': 'application/json'},
-                                credentials: 'same-origin'
-                            });
-
-                            if (r.status === 204) {
-                                toast('Таймер не был запущен');
-                                return;
-                            }
-                            if (!r.ok) {
-                                toast('Не удалось остановить');
-                                return;
-                            }
-
-                            let data = {};
-                            try {
-                                data = await r.json();
-                            } catch (e) {
-                            }
-                            if (data?.status === 'noop') {
-                                toast('Таймер не был запущен');
-                                return;
-                            }
-
-                            const t = (data && data.timer) ? data.timer : (data || {});
-                            const idCandidate = t.id ?? data?.id ?? t.timer_id ?? getRunningRowId() ?? null;
-
-                            const payload = {
-                                started_at: t.started_at
-                                    || getRunningRow()?.getAttribute('data-started')
-                                    || new Date(activeStartMs || Date.now()).toISOString(),
-                                stopped_at: t.stopped_at || new Date().toISOString(),
-                                id: idCandidate
-                            };
-
-                            finalizeActiveRow(payload);
-                            toast('Таймер остановлен');
-
-                            window.dispatchEvent(new CustomEvent('timer:stopped', {
-                                detail: {
-                                    origin: 'page',
-                                    timer: {task_id: @json($task->id), ...payload, user: {name: timersUserName}}
-                                }
-                            }));
-
-                        } catch (e) {
-                            console.error(e);
-                            toast('Ошибка сети');
-                        }
-                    }
-
-                    document.getElementById('btnTimerStop').addEventListener('click', stopNow);
-
-                    // события от плавающей плашки
-                    window.addEventListener('timer:started', (e) => {
-                        const d = e.detail || {};
-                        if (Number(d.task_id) !== Number(@json($task->id))) return;
-                        const started = d.started_at || new Date().toISOString();
-                        const ms = parseTs(started);
-                        if (!isNaN(ms)) {
-                            activeStartMs = ms;
-                            ensureActiveRow(@json(auth()->user()->name), started, d.id || null);
-                            tick();
-                        }
-                    });
-
-                    window.addEventListener('timer:stopped', (e) => {
-                        if (e?.detail?.origin === 'page') return;
-                        const t = (e.detail && (e.detail.timer || e.detail)) || {};
-                        if (Number(t.task_id) !== Number(@json($task->id))) return;
-
-                        const started = t.started_at
-                            || document.querySelector('#timersBody tr.running-row')?.getAttribute('data-started')
-                            || new Date(activeStartMs || Date.now()).toISOString();
-                        const stopped = t.stopped_at || new Date().toISOString();
-                        const id = t.id ?? getRunningRowId() ?? null;
-
-                        finalizeActiveRow({started_at: started, stopped_at: stopped, id});
-                    });
-
-                    // ручное добавление интервала
-                    document.getElementById('manualTimerForm').addEventListener('submit', async (e) => {
-                        e.preventDefault();
-
-                        const startVal = document.getElementById('manualStart')?.value;
-                        const stopVal = document.getElementById('manualStop')?.value;
-
-                        const startIso = startVal ? new Date(startVal).toISOString() : '';
-                        const stopIso = stopVal ? new Date(stopVal).toISOString() : '';
-
-                        const fd = new FormData(e.currentTarget);
-                        fd.set('started_at', startIso || startVal);
-                        fd.set('stopped_at', stopIso || stopVal);
-                        fd.set('tz_offset', String(new Date().getTimezoneOffset()));
-
-                        try {
-                            const r = await fetch(stopUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRF-TOKEN': csrf,
-                                    'Accept': 'application/json',
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                },
-                                body: fd,
-                                credentials: 'same-origin'
-                            });
-                            if (!r.ok) {
-                                toast('Не удалось добавить');
-                                return;
-                            }
-
-                            let data = {};
-                            try {
-                                data = await r.json();
-                            } catch (_) {
-                            }
-
-                            const T = (data && data.timer) ? data.timer : (data || {});
-                            let timerId = T.id ?? T.timer_id ?? data?.id ?? null;
-
-                            if (!timerId && data?.row) {
-                                const m = String(data.row).match(/data-id="(\d+)"/);
-                                if (m) timerId = m[1];
-                            }
-
-                            const startRaw = T.started_at ?? startIso ?? startVal;
-                            const stopRaw = T.stopped_at ?? stopIso ?? stopVal;
-
-                            const durSec = Math.max(0, Math.floor((parseTs(stopRaw) - parseTs(startRaw)) / 1000));
-
-                            const tr = document.createElement('tr');
-                            tr.className = 'border-t';
-                            if (timerId) tr.dataset.id = timerId;
-                            tr.setAttribute('data-started', toIso(startRaw) || startRaw);
-                            tr.setAttribute('data-stopped', toIso(stopRaw) || stopRaw);
-
-                            tr.innerHTML = `
-<td class="py-2 pr-4">{{ addslashes(auth()->user()->name) }}</td>
-<td class="py-2 pr-4">${fmtTs(startRaw)}</td>
-<td class="py-2 pr-4">${fmtTs(stopRaw)}</td>
-<td class="py-2">${fmtHMS(durSec)}</td>
-<td class="py-2 timer-actions"><button type="button" class="px-2 py-1 border rounded timer-del">Удалить</button></td>`;
-
-                            document.getElementById('timersBody').prepend(tr);
-
-                            baseTotal += durSec;
-                            tick();
-
-                            e.currentTarget.reset();
-                            toast(timerId ? 'Интервал добавлен' : 'Интервал добавлен (id не вернулся)');
-                        } catch (err) {
-                            console.error(err);
-                            toast('Ошибка сети');
-                        }
-                    });
-
-                    // ---------- Удаление таймера ----------
-                    timersBody.addEventListener('click', async (e) => {
-                        const btn = e.target.closest('.timer-del');
-                        if (!btn) return;
-
-                        const tr = btn.closest('tr');
-                        if (!tr) return;
-
-                        const isRunning = (tr.classList.contains('running-row') || tr.children[2].textContent.trim() === '—');
-                        if (isRunning) {
-                            toast('Сначала остановите таймер');
-                            return;
-                        }
-
-                        const id = tr.dataset.id;
-                        if (!id) {
-                            toast('Не удалось определить ID таймера');
-                            return;
-                        }
-
-                        if (!confirm('Удалить этот интервал времени?')) return;
-
-                        try {
-                            const r = await fetch(timerDelUrl(id), {
-                                method: 'DELETE',
-                                headers: {'X-CSRF-TOKEN': csrf, 'Accept': 'application/json'},
-                                credentials: 'same-origin'
-                            });
-                            if (!r.ok) {
-                                toast('Не удалось удалить таймер');
-                                return;
-                            }
-
-                            const durSec = durFromText(tr.children[3].textContent.trim());
-                            baseTotal = Math.max(0, baseTotal - durSec);
-                            tr.remove();
-                            tick();
-                            toast('Таймер удалён');
-                        } catch (err) {
-                            console.error(err);
-                            toast('Ошибка сети');
-                        }
-                    });
 
                 })();
             </script>
