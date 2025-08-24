@@ -23,7 +23,7 @@ class Task extends Model
     protected $fillable = [
         'board_id','column_id','title','details',
         'due_at','due_to','assignee_id','card_order',
-        'steps','type_id','priority_id',
+        'steps','type_id','priority_id','complete',
     ];
 
     protected $casts = [
@@ -31,6 +31,7 @@ class Task extends Model
         'due_at' => 'datetime',
         'due_to' => 'datetime',
         'grade_id' => 'integer',
+        'complete' => 'boolean',
     ];
 
     protected static function booted(): void

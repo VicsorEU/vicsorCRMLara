@@ -13,6 +13,15 @@
         $deptIdToName        = $departments->pluck('name','id')->all();
         $taskTypeIdToName    = $taskTypes->pluck('name','id')->all();
         $priorityIdToName    = $priorities->pluck('name','id')->all();
+
+        // $project->board уже загружен с columns
+        $board = $project->board()->with('columns.tasks')->first();
+
+        // Пытаемся найти колонку по системной роли
+        $doneCol = optional($board)->columns->firstWhere('kind', 'done');
+
+        $doneColumnId = optional($doneCol)->id;
+
     @endphp
 
     <style>
@@ -122,19 +131,41 @@
                                  style="background-color: {{ $col->color ?? '#94a3b8' }};">
                                 <div class="cursor-move select-none opacity-80">☰</div>
 
-                                <input value="{{ $col->name }}"
-                                       @change="renameColumn({{ $col->id }}, $event.target.value)"
-                                       class="flex-1 border rounded-lg px-2 py-1 bg-white text-slate-900">
+                                @if(($col->system_key ?? null) === 'done')
+
+                                <div x-data="{ showHint:false }" class="relative">
+                                    <div x-cloak x-show="showHint"
+                                         class="absolute -top-12 left-0 z-50 whitespace-nowrap text-[14px] text-slate-900 bg-white border rounded-md shadow px-2 py-1">
+                                        В эту колонку переносятся все<br>завершенные задачи
+                                        <span class="absolute left-3 -bottom-2 block w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-white"></span>
+                                    </div>
+
+                                    <input value="{{ $col->name }}"
+                                           @focus="showHint = true"
+                                           @blur="showHint = false"
+                                           @mouseenter="showHint = true"
+                                           @mouseleave="showHint = false"
+                                           @change="renameColumn({{ $col->id }}, $event.target.value)"
+                                           class="flex-1 border rounded-lg px-2 py-1 bg-white text-slate-900">
+                                </div>
+                                @else
+                                    <input value="{{ $col->name }}"
+                                           @change="renameColumn({{ $col->id }}, $event.target.value)"
+                                           class="flex-1 border rounded-lg px-2 py-1 bg-white text-slate-900">
+                                @endif
 
                                 <input type="color" value="{{ $col->color ?? '#94a3b8' }}"
                                        @change="recolorColumn({{ $col->id }}, $event.target.value)"
                                        class="w-10 h-8 border rounded cursor-pointer">
 
                                 <button @click="openTaskModal({{ $col->id }})"
-                                        class="ml-auto px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30">+ Задача</button>
+                                        class="ml-auto px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30">+</button>
 
-                                <button @click="removeColumn({{ $col->id }})"
-                                        class="px-2 text-white/90 hover:text-white">✕</button>
+                                @unless(($col->system_key ?? null) === 'done')
+                                    <button @click="removeColumn({{ $col->id }})"
+                                            class="px-2 text-white/90 hover:text-white">✕</button>
+                                @endunless
+
                             </div>
 
                             <div class="p-3">
@@ -339,6 +370,10 @@
 
                 // ---------- init ----------
                 init(){
+                    window.__colRename    = this.renameColumn.bind(this);
+                    window.__colRecolor   = this.recolorColumn.bind(this);
+                    window.__colRemove    = this.removeColumn.bind(this);
+                    window.__openTaskModal= this.openTaskModal.bind(this);
                     document.querySelectorAll('.kanban-column').forEach(el => this.attachColumnSortable(el));
                     new Sortable(document.getElementById('columns'), {
                         animation:150, handle:'.cursor-move', draggable:'.column',
@@ -666,10 +701,11 @@
             }
         }
 
-        // Глобальные прокси для динамически добавленных колонок
+        // УДАЛИТЬ целиком этот блок
         window.__colRename = (id,val)=>document.querySelector('[x-data]').__x.$data.renameColumn(id,val);
         window.__colRecolor = (id,val)=>document.querySelector('[x-data]').__x.$data.recolorColumn(id,val);
         window.__colRemove  = (id)=>document.querySelector('[x-data]').__x.$data.removeColumn(id);
         window.__openTaskModal = (col)=>document.querySelector('[x-data]').__x.$data.openTaskModal(col);
+
     </script>
 @endsection

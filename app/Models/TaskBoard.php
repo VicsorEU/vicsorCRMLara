@@ -22,4 +22,9 @@ class TaskBoard extends Model
     public function tasks(): HasMany {
         return $this->hasMany(Task::class, 'board_id');
     }
+
+    public function doneColumn(): ?TaskColumn
+    {
+        return $this->columns()->where('system_key', 'done')->first();
+    }
 }

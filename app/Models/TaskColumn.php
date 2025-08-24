@@ -12,7 +12,7 @@ class TaskColumn extends Model
 {
     use Auditable;
 
-    protected $fillable = ['board_id', 'name', 'color', 'sort_order'];
+    protected $fillable = ['board_id', 'name', 'color', 'sort_order', 'system_key',];
 
     public function board(): BelongsTo
     {
@@ -22,5 +22,15 @@ class TaskColumn extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class, 'column_id')->orderBy('card_order');
+    }
+
+    public function scopeSystem(Builder $q, string $key): Builder
+    {
+        return $q->where('system_key', $key);
+    }
+
+    public function scopeDone(Builder $q): Builder
+    {
+        return $q->where('system_key', 'done');
     }
 }

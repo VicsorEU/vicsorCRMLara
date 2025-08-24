@@ -9,7 +9,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
+        // Вариант 1: встроенный health-check на /up
         health: '/up',
+    // Вариант 2 (если используешь свой файл): health: __DIR__.'/../routes/health.php',
     )
     ->withMiddleware(function (Middleware $middleware) {
         // Доверяем прокси хостинга и читаем X-Forwarded-* для https/host/port
@@ -21,17 +23,19 @@ return Application::configure(basePath: dirname(__DIR__))
             | Request::HEADER_X_FORWARDED_PROTO
         );
 
-        // при необходимости можно добавить:
+        // Алиасы для роут-мидлварей
+        $middleware->alias([
+            'task.lock'           => \App\Http\Middleware\LockCompletedTask::class,
+            'role'                => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+            'permission'          => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+            'role_or_permission'  => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
+        ]);
+
+        // При желании:
         // $middleware->redirectGuestsTo('/login');
         // $middleware->redirectUsersTo('/dashboard');
     })
-    ->withMiddleware(function (\Illuminate\Foundation\Configuration\Middleware $middleware) {
-        $middleware->alias([
-            'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
-        ]);
-    })
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
-    })->create();
+    })
+    ->create();

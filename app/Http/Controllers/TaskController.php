@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Models\{Project, User};
+use Illuminate\Support\Facades\Schema;
 
 class TaskController extends Controller
 {
@@ -189,4 +190,73 @@ class TaskController extends Controller
         $usersMap = $users->pluck('name','id');
         return view('tasks.show', compact('task','users','usersMap'));
     }
+
+    public function markComplete(Request $request, Task $task)
+    {
+        $data = $request->validate([
+            'complete' => ['required', 'boolean'],
+        ]);
+
+        DB::transaction(function () use ($task, $data) {
+            // 1) Меняем флаг complete
+            $task->complete = (bool)$data['complete'];
+            $task->save();
+
+            // 2) Пытаемся найти доску и колонки
+            $board = $task->board()->with('columns')->first();
+            if (!$board) {
+                return; // нечего перемещать, если доски нет
+            }
+
+            if ($task->complete) {
+                // → DONE-колонка
+                $targetCol = $board->columns->firstWhere('system_key', 'done');
+            } else {
+                // → Первая колонка по sort_order (возврат в работу)
+                $targetCol = $board->columns
+                    ->sortBy([['sort_order', 'asc'], ['id', 'asc']])
+                    ->first();
+            }
+
+            if (!$targetCol) {
+                // если нужной колонки нет — просто оставим задачу, где была
+                return;
+            }
+
+            // Уже в нужной колонке? Тогда только позицию можно не трогать
+            if ((int)$task->column_id === (int)$targetCol->id) {
+                return;
+            }
+
+            // 3) Перемещаем в целевую колонку, ставим в самый низ
+            $task->column_id = $targetCol->id;
+
+            // Если у задач есть поле position/ sort/ sort_order — положим в конец
+            $positionField = null;
+            foreach (['position', 'sort', 'sort_order'] as $f) {
+                if (Schema::hasColumn('tasks', $f)) {
+                    $positionField = $f;
+                    break;
+                }
+            }
+
+            if ($positionField) {
+                $maxPos = (int) \App\Models\Task::where('column_id', $targetCol->id)->max($positionField);
+                $task->{$positionField} = $maxPos + 1;
+            }
+
+            $task->save();
+        });
+
+        $task->refresh();
+
+        return $request->wantsJson()
+            ? response()->json([
+                'ok'        => true,
+                'complete'  => (bool)$task->complete,
+                'column_id' => $task->column_id,
+            ])
+            : back();
+    }
+
 }

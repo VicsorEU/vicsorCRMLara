@@ -48,7 +48,7 @@ class ProjectController extends Controller
         $board->columns()->createMany([
             ['name'=>'To Do','color'=>'#64748b','sort_order'=>1],
             ['name'=>'In Progress','color'=>'#2563eb','sort_order'=>2],
-            ['name'=>'Done','color'=>'#16a34a','sort_order'=>3],
+            ['name' => 'Done',        'color' => '#16a34a', 'sort_order' => 3, 'system_key' => 'done'],
         ]);
 
         return response()->json([

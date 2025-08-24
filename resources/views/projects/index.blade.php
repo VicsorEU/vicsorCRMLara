@@ -201,7 +201,7 @@
                         <div>
                             <label class="block text-sm mb-1">Отдел</label>
                             <select x-model.number="form.department" required class="w-full border rounded-lg px-3 py-2">
-                                <option value="" disabled>— выберите отдел —</option>
+                                <option value="">— выберите отдел —</option>
                                 @foreach($deptIdToName as $id => $name)
                                     <option value="{{ $id }}">{{ $name }}</option>
                                 @endforeach
