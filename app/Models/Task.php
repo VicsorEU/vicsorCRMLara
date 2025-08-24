@@ -121,4 +121,10 @@ class Task extends Model
         return $this->belongsTo(ProjectGrade::class, 'grade_id');
     }
 
+    public function subtasks()
+    {
+        return $this->hasMany(\App\Models\Subtask::class);
+    }
+
+
 }

@@ -158,6 +158,8 @@ use App\Http\Controllers\{
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\Settings\ProjectTaxonomyController;
 use App\Http\Controllers\Tasks\TaskTaxonomyController;
+use App\Http\Controllers\SubtaskController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -266,6 +268,17 @@ Route::middleware('auth')->group(function () {
     // чтобы можно было снять блокировку
     Route::patch('/tasks/{task}/complete', [TaskController::class, 'markComplete'])
         ->whereNumber('task')->name('tasks.complete');
+
+    // подзадачи
+    Route::get   ('/tasks/{task}/subtasks',            [SubtaskController::class,'index'])->whereNumber('task')->name('subtasks.index');
+    Route::post  ('/tasks/{task}/subtasks',            [SubtaskController::class,'store'])->whereNumber('task')->name('subtasks.store');
+
+    Route::patch ('/subtasks/{subtask}',               [SubtaskController::class,'update'])->whereNumber('subtask')->name('subtasks.update');
+    Route::delete('/subtasks/{subtask}',               [SubtaskController::class,'destroy'])->whereNumber('subtask')->name('subtasks.destroy');
+    Route::patch ('/subtasks/{subtask}/complete',      [SubtaskController::class,'complete'])->whereNumber('subtask')->name('subtasks.complete');
+
+    Route::post  ('/subtasks/{subtask}/timer/start',   [SubtaskController::class,'timerStart'])->whereNumber('subtask')->name('subtasks.timer.start');
+    Route::post  ('/subtasks/{subtask}/timer/stop',    [SubtaskController::class,'timerStop'])->whereNumber('subtask')->name('subtasks.timer.stop');
 
     // Служебные маршруты таймера и файлов (не привязаны к {task})
     Route::get('/timer/active', [TimerController::class, 'active'])->name('kanban.timer.active');

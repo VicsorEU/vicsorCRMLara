@@ -305,6 +305,15 @@
                     </div>
                 </div>
 
+                {{-- Подзадачи--}}
+                @include('tasks._subtasks', [
+                    'task' => $task,
+                    'users' => $users,
+                    'taskTypes' => $taskTypes,
+                    'priorities' => $priorities,
+                ])
+
+
                 {{-- Учёт времени --}}
                 <div class="bg-white border rounded-2xl shadow-soft">
                     <div class="px-5 py-3 border-б font-medium">Учёт времени</div>
