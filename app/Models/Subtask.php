@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\Auditable;
 
 class Subtask extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'task_id','title','details','due_at','due_to',
         'assignee_id','priority_id','type_id',

@@ -4,9 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use App\Models\Concerns\Auditable;
+
 
 class WorkTimer extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'user_id','task_id','subtask_id','title','started_at','stopped_at',
     ];
