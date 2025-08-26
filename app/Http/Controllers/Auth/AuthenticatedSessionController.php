@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Validation\ValidationException;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -16,6 +18,20 @@ class AuthenticatedSessionController extends Controller
 
     public function store(LoginRequest $request)
     {
+        $request->validate([
+            'email'    => ['required','email'],
+            'password' => ['required','string'],
+        ]);
+
+        // если пользователь заблокирован — не даём логиниться
+        if ($user = User::where('email', $request->email)->first()) {
+            if ($user->blocked_at) {
+                throw ValidationException::withMessages([
+                    'email' => 'Аккаунт заблокирован.',
+                ]);
+            }
+        }
+
         $credentials = $request->only('email', 'password');
         $remember = (bool) $request->boolean('remember');
 

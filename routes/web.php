@@ -160,6 +160,8 @@ use App\Http\Controllers\Settings\ProjectTaxonomyController;
 use App\Http\Controllers\Tasks\TaskTaxonomyController;
 use App\Http\Controllers\SubtaskController;
 use App\Http\Controllers\WorkTimerController;
+use App\Http\Controllers\Settings\users\UsersSettingsController;
+
 
 
 
@@ -313,7 +315,7 @@ Route::middleware('auth')->group(function () {
     // Настройки
     // =====================================================================
     Route::get('/settings/{section?}', [SettingsController::class, 'index'])
-        ->where('section', 'general|projects')
+        ->where('section', 'general|projects|users')
         ->name('settings.index');
 
     Route::post('/settings/general', [SettingsController::class, 'saveGeneral'])
@@ -332,4 +334,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/taxonomy/{group}', [ProjectTaxonomyController::class, 'save'])
             ->name('settings.projects.taxonomy.save');
     });
+
+    Route::prefix('settings/users')->middleware(['auth'])->name('settings.users.')->group(function () {
+        // USERS
+        Route::get('/users',                 [UsersSettingsController::class,'usersIndex'])->name('users.index');
+        Route::post('/users',                [UsersSettingsController::class,'usersStore'])->name('users.store');
+        Route::patch('/users/{user}',        [UsersSettingsController::class,'usersUpdate'])->whereNumber('user')->name('users.update');
+        Route::patch('/users/{user}/block',  [UsersSettingsController::class,'usersBlockToggle'])->whereNumber('user')->name('users.block');
+        Route::delete('/users/{user}',       [UsersSettingsController::class,'usersDestroy'])->whereNumber('user')->name('users.destroy');
+
+        // GROUPS
+        Route::get('/groups',                [UsersSettingsController::class,'groupsIndex'])->name('groups.index');
+        Route::post('/groups',               [UsersSettingsController::class,'groupsStore'])->name('groups.store');
+        Route::patch('/groups/{group}',      [UsersSettingsController::class,'groupsUpdate'])->whereNumber('group')->name('groups.update');
+        Route::delete('/groups/{group}',     [UsersSettingsController::class,'groupsDestroy'])->whereNumber('group')->name('groups.destroy');
+    });
+
 });

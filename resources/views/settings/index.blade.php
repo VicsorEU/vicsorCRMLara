@@ -38,6 +38,10 @@
                        class="px-3 py-1.5 rounded-lg border {{ ($section??'general')==='projects' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
                         Проекты
                     </a>
+                    <a href="{{ route('settings.index', ['section'=>'users']) }}"
+                       class="px-3 py-1.5 rounded-lg border {{ ($section??'general')==='users' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
+                        Пользователи
+                    </a>
                 </nav>
             </div>
         </div>
@@ -161,7 +165,9 @@
         @if(($section??'projects')==='projects')
             @include('settings.projects')
         @endif
-
+        @if(($section??'users')==='users')
+            @include('settings.users')
+        @endif
         @include('shared.toast')
     </div>
 
