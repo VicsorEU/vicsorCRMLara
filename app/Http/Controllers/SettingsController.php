@@ -10,10 +10,15 @@ use Illuminate\Support\Facades\DB;
 
 class SettingsController extends Controller
 {
-    public function index(?string $section = null)
+    public function index(Request $request)
     {
-        $section = $section ?: 'general';
+        // секция теперь приходит как query (?section=...)
+        $section = $request->query('section', 'general');
+        if (!in_array($section, ['general','projects','users'], true)) {
+            $section = 'general';
+        }
 
+        // ====== Общие ======
         if ($section === 'general') {
             $general = AppSetting::get('general', [
                 'company_name' => '',
@@ -27,7 +32,9 @@ class SettingsController extends Controller
             return view('settings.index', compact('section','general'));
         }
 
+        // ====== Проекты ======
         if ($section === 'projects') {
+            // тянем справочники; имена таблиц — как у тебя
             $projects = [
                 'departments' => DB::table('settings_project_departments')->orderBy('position')->orderBy('id')->get(),
                 'types'       => DB::table('settings_project_task_types')->orderBy('position')->orderBy('id')->get(),
@@ -35,10 +42,21 @@ class SettingsController extends Controller
                 'randlables'  => DB::table('settings_project_randlables')->orderBy('position')->orderBy('id')->get(),
                 'grades'      => DB::table('settings_project_grades')->orderBy('position')->orderBy('id')->get(),
             ];
-            return view('settings.index', compact('section','projects'));
+
+            // на всякий случай пробросим и по-отдельности — если partial ждёт отдельные переменные
+            $departments = $projects['departments'];
+            $types       = $projects['types'];
+            $priorities  = $projects['priorities'];
+            $randlables  = $projects['randlables'];
+            $grades      = $projects['grades'];
+
+            return view('settings.index', compact(
+                'section','projects','departments','types','priorities','randlables','grades'
+            ));
         }
 
-
+        // ====== Пользователи ======
+        // Обычно данные тут грузятся через AJAX (/settings/users, /settings/groups, /settings/roles)
         return view('settings.index', compact('section'));
     }
 
@@ -92,7 +110,7 @@ class SettingsController extends Controller
 
     public function saveProjects(Request $request)
     {
-        // принимаем имена и цвета (ID не ждём от формы — считаем на бэке)
+        // ... (оставил без изменений — у тебя всё ок)
         $rules = [
             'departments'          => ['nullable','array'],
             'departments.*'        => ['string','max:100'],
@@ -124,7 +142,6 @@ class SettingsController extends Controller
         $DEF = '#94a3b8';
         $validColor = fn($c) => is_string($c) && preg_match('/^#([0-9a-f]{3}|[0-9a-f]{6})$/i', $c);
 
-        // Текущие сохранённые настройки (обязательно с *_ids)
         $current = AppSetting::get('projects', [
             'departments'=>[], 'departments_colors'=>[], 'departments_ids'=>[],
             'types'=>[],       'types_colors'=>[],       'types_ids'=>[],
@@ -133,7 +150,6 @@ class SettingsController extends Controller
             'grades'=>[],      'grades_colors'=>[],      'grades_ids'=>[],
         ]);
 
-        // helper: нормализация имён (trim + uniq по lc, с сохранением первого в исходном порядке)
         $normNames = function (?array $arr): array {
             if (!is_array($arr)) return [];
             $out = []; $seen = [];
@@ -148,24 +164,17 @@ class SettingsController extends Controller
             return array_values($out);
         };
 
-        /**
-         * Универсальный расчёт для группы: имена+цвета+стабильные ID
-         * @return array [names, colors, ids]
-         */
         $calcGroup = function (string $g) use ($validated, $current, $normNames, $validColor, $DEF): array {
             $cKey = $g.'_colors';
             $iKey = $g.'_ids';
 
-            // вход
             $inNames  = $normNames($validated[$g] ?? []);
             $inColors = $validated[$cKey] ?? [];
 
-            // прошлые
             $prevNames  = array_values($current[$g]    ?? []);
             $prevColors = array_values($current[$cKey] ?? []);
             $prevIds    = array_values($current[$iKey] ?? []);
 
-            // карта "старое имя (lc) -> [id,color]"
             $prevMap = [];
             foreach ($prevNames as $i=>$n) {
                 $prevMap[mb_strtolower((string)$n)] = [
@@ -174,7 +183,6 @@ class SettingsController extends Controller
                 ];
             }
 
-            // определим следующий id в этой группе
             $nextId = 0;
             foreach ($prevIds as $x) { $nextId = max($nextId, (int)$x); }
 
@@ -185,12 +193,10 @@ class SettingsController extends Controller
             foreach ($inNames as $i => $name) {
                 $lc = mb_strtolower($name);
 
-                // цвет: из входа, иначе — из прошлых, иначе дефолт
                 $candColor = $inColors[$i] ?? null;
                 $prevColor = $prevMap[$lc]['color'] ?? null;
                 $outColors[] = $validColor($candColor) ? $candColor : ($validColor($prevColor) ? $prevColor : $DEF);
 
-                // id: если имя было — оставить прежний id, иначе выдать новый
                 if (isset($prevMap[$lc])) {
                     $outIds[] = (int)$prevMap[$lc]['id'];
                 } else {
@@ -202,8 +208,6 @@ class SettingsController extends Controller
         };
 
         $payload = [];
-
-        // Считаем для всех групп (включая departments)
         foreach (['departments','types','priorities','randlables','grades'] as $group) {
             [$names, $colors, $ids] = $calcGroup($group);
             $payload[$group]           = $names;
@@ -211,11 +215,8 @@ class SettingsController extends Controller
             $payload[$group.'_ids']    = $ids;
         }
 
-        // Сохраняем настройки
         AppSetting::updateOrCreate(['key' => 'projects'], ['value' => $payload]);
 
-        // ----- Синхронизация связей ТОЛЬКО для departments (projects.department) -----
-        // 1) Обнулим department у проектов, где ID удалён
         $prevDepIds = array_values($current['departments_ids'] ?? []);
         $newDepIds  = array_values($payload['departments_ids'] ?? []);
         $removedIds = array_diff(array_map('intval',$prevDepIds ?: []), array_map('intval',$newDepIds ?: []));
@@ -223,8 +224,6 @@ class SettingsController extends Controller
             DB::table('projects')->whereIn('department', $removedIds)->update(['department' => null]);
         }
 
-        // 2) Миграция старых строковых значений department -> ID (на случай старых записей)
-        //    Проходим по актуальному списку имён и подставляем соответствующий ID
         foreach (($payload['departments'] ?? []) as $i => $name) {
             $id = (int)($payload['departments_ids'][$i] ?? 0);
             if ($id > 0 && $name !== '') {
@@ -232,17 +231,13 @@ class SettingsController extends Controller
             }
         }
 
-        // ВАЖНО: для типов/важностей и прочего мы тут НИЧЕГО не мигрируем,
-        // потому что их хранение в задачах у вас сейчас строковое и/или под CHECK-constraint.
-        // Если позже переведёте задачи на хранение по *_id — добавите аналогичные апдейты.
-
         return response()->json(['message' => 'ok', 'data' => $payload]);
     }
 
     public function uploadLogo(Request $r)
     {
         $r->validate([
-            'file' => ['required','image','max:20480'], // до ~20 МБ
+            'file' => ['required','image','max:20480'],
         ]);
 
         $path = $r->file('file')->store('company', 'public');

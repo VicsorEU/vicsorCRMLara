@@ -25,9 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Алиасы для роут-мидлварей
         $middleware->alias([
-            'role'                => \Spatie\Permission\Middlewares\RoleMiddleware::class,
-            'permission'          => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
-            'role_or_permission'  => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
+            'role'               => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+            'permission'         => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
+
+            // Наш алиас проверки доступов по abilities JSON
+            'access'             => \App\Http\Middleware\AccessMiddleware::class,
         ]);
 
         // При желании:

@@ -5,13 +5,17 @@
 
 @section('content')
     @php
+        // ➊ Берём вкладку из query (?section=...), валидируем
+        $section = in_array(request('section'), ['general','projects','users'], true)
+            ? request('section')
+            : 'general';
+
         $timezones  = \DateTimeZone::listIdentifiers();
         $countries  = [
             ['UA','Украина'], ['PL','Польша'], ['DE','Германия'],
             ['US','США'], ['GB','Великобритания'], ['CZ','Чехия'],
         ];
 
-        // Собираем initial в PHP, чтобы избежать ошибок парсинга в @json
         $initial = $general ?? [
             'company_name' => '',
             'country'      => 'UA',
@@ -24,6 +28,7 @@
         ];
     @endphp
 
+
     <div class="space-y-6" x-data="generalSettings()">
         {{-- Поднастройки --}}
         <div class="bg-white border rounded-2xl shadow-soft">
@@ -31,15 +36,15 @@
             <div class="p-5">
                 <nav class="flex flex-wrap gap-2">
                     <a href="{{ route('settings.index') }}"
-                       class="px-3 py-1.5 rounded-lg border {{ ($section??'general')==='general' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
+                       class="px-3 py-1.5 rounded-lg border {{ $section==='general' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
                         Общие
                     </a>
                     <a href="{{ route('settings.index', ['section'=>'projects']) }}"
-                       class="px-3 py-1.5 rounded-lg border {{ ($section??'general')==='projects' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
+                       class="px-3 py-1.5 rounded-lg border {{ $section==='projects' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
                         Проекты
                     </a>
                     <a href="{{ route('settings.index', ['section'=>'users']) }}"
-                       class="px-3 py-1.5 rounded-lg border {{ ($section??'general')==='users' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
+                       class="px-3 py-1.5 rounded-lg border {{ $section==='users' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
                         Пользователи
                     </a>
                 </nav>
@@ -47,7 +52,7 @@
         </div>
 
         {{-- Общие --}}
-        @if(($section??'general')==='general')
+        @if($section === 'general')
             <div class="bg-white border rounded-2xl shadow-soft">
                 <div class="px-5 py-3 border-b font-medium">Общие</div>
 
@@ -162,10 +167,11 @@
                 </div>
             </div>
         @endif
-        @if(($section??'projects')==='projects')
+        @if($section === 'projects')
             @include('settings.projects')
         @endif
-        @if(($section??'users')==='users')
+
+        @if($section === 'users')
             @include('settings.users')
         @endif
         @include('shared.toast')

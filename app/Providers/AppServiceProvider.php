@@ -34,5 +34,11 @@ class AppServiceProvider extends ServiceProvider
         Blade::if('taskOpen', function ($task) {
             return ! (bool)($task?->complete);
         });
+
+        Blade::if('canAccess', function (string $resource, ...$needs) {
+            $user = auth()->user();
+            if (!$user) return false;
+            return \App\Services\Access::can($user, $resource, $needs);
+        });
     }
 }

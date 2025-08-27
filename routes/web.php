@@ -163,9 +163,10 @@ use App\Http\Controllers\WorkTimerController;
 use App\Http\Controllers\Settings\users\UsersSettingsController;
 use App\Http\Controllers\Settings\users\RolesController;
 
+use App\Services\Access;
 
-
-
+use App\Http\Controllers\Settings\users\UsersSettingsController as UsersCtrl;
+use App\Http\Controllers\Settings\users\RolesController       as RolesCtrl;
 
 /*
 |--------------------------------------------------------------------------
@@ -315,45 +316,103 @@ Route::middleware('auth')->group(function () {
     // =====================================================================
     // Настройки
     // =====================================================================
-    Route::get('/settings/{section?}', [SettingsController::class, 'index'])
-        ->where('section', 'general|projects|users')
+
+    // Главный экран настроек — право на просмотр
+    Route::get('/settings', [SettingsController::class,'index'])
+        ->middleware(['auth','access:settings,view'])
         ->name('settings.index');
 
+    // Системные настройки (если используешь) — только FULL
     Route::post('/settings/general', [SettingsController::class, 'saveGeneral'])
+        ->middleware(['auth','access:settings,full'])
         ->name('settings.general.save');
+
     Route::post('/settings/logo', [SettingsController::class, 'uploadLogo'])
+        ->middleware(['auth','access:settings,full'])
         ->name('settings.logo.upload');
+
     Route::delete('/settings/logo', [SettingsController::class, 'deleteLogo'])
+        ->middleware(['auth','access:settings,full'])
         ->name('settings.logo.delete');
 
-    // (Для сохранения старого JSON-формата «projects», если используете)
     Route::post('/settings/projects/save', [SettingsController::class, 'saveProjects'])
+        ->middleware(['auth','access:settings,full'])
         ->name('settings.projects.save');
 
-    // Таксономии проектов (департаменты, типы, важности, метки, оценки)
-    Route::prefix('settings/projects')->group(function () {
-        Route::post('/taxonomy/{group}', [ProjectTaxonomyController::class, 'save'])
-            ->name('settings.projects.taxonomy.save');
-    });
+    Route::post('/settings/projects/taxonomy/{group}', [ProjectTaxonomyController::class, 'save'])
+        ->whereAlpha('group')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.projects.taxonomy.save');
 
-    Route::prefix('settings/users')->middleware(['auth'])->name('settings.users.')->group(function () {
-        // USERS
-        Route::get('/users',                 [UsersSettingsController::class,'usersIndex'])->name('users.index');
-        Route::post('/users',                [UsersSettingsController::class,'usersStore'])->name('users.store');
-        Route::patch('/users/{user}',        [UsersSettingsController::class,'usersUpdate'])->whereNumber('user')->name('users.update');
-        Route::patch('/users/{user}/block',  [UsersSettingsController::class,'usersBlockToggle'])->whereNumber('user')->name('users.block');
-        Route::delete('/users/{user}',       [UsersSettingsController::class,'usersDestroy'])->whereNumber('user')->name('users.destroy');
+    //
+    // ---- Users (JSON для твоего фронта)
+    //   ВАЖНО: для implicit binding используем {user}, потому что в контроллере
+    //   сигнатуры типа usersUpdate(Request $r, User $user)
+    //
+    Route::get(   '/settings/users',               [UsersCtrl::class,'usersIndex'])
+        ->middleware(['auth','access:settings,view'])
+        ->name('settings.users.users.index');
 
-        // GROUPS
-        Route::get('/groups',                [UsersSettingsController::class,'groupsIndex'])->name('groups.index');
-        Route::post('/groups',               [UsersSettingsController::class,'groupsStore'])->name('groups.store');
-        Route::patch('/groups/{group}',      [UsersSettingsController::class,'groupsUpdate'])->whereNumber('group')->name('groups.update');
-        Route::delete('/groups/{group}',     [UsersSettingsController::class,'groupsDestroy'])->whereNumber('group')->name('groups.destroy');
-        Route::get ('roles',               [RolesController::class,'index'])->name('roles.index');
-        Route::post('roles',               [RolesController::class,'store'])->name('roles.store');
-        Route::patch('roles/{role}',       [RolesController::class,'update'])->name('roles.update');
-        Route::delete('roles/{role}',      [RolesController::class,'destroy'])->name('roles.destroy');
+    Route::post(  '/settings/users',               [UsersCtrl::class,'usersStore'])
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.users.store');
 
-    });
+    Route::patch( '/settings/users/{user}',        [UsersCtrl::class,'usersUpdate'])
+        ->whereNumber('user')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.users.update');
 
+    Route::patch( '/settings/users/{user}/block',  [UsersCtrl::class,'usersBlockToggle'])
+        ->whereNumber('user')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.users.block');
+
+    Route::delete('/settings/users/{user}',        [UsersCtrl::class,'usersDestroy'])
+        ->whereNumber('user')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.users.destroy');
+
+    //
+    // ---- Groups (тем же контроллером)
+    //   Тоже важно: {group} для implicit binding в groupsUpdate(Request $r, Group $group)
+    //
+    Route::get(   '/settings/groups',              [UsersCtrl::class,'groupsIndex'])
+        ->middleware(['auth','access:settings,view'])
+        ->name('settings.users.groups.index');
+
+    Route::post(  '/settings/groups',              [UsersCtrl::class,'groupsStore'])
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.groups.store');
+
+    Route::patch( '/settings/groups/{group}',      [UsersCtrl::class,'groupsUpdate'])
+        ->whereNumber('group')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.groups.update');
+
+    Route::delete('/settings/groups/{group}',      [UsersCtrl::class,'groupsDestroy'])
+        ->whereNumber('group')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.groups.destroy');
+
+    //
+    // ---- Roles (если у тебя есть RolesController)
+    //   Если в нём implicit binding (Role $role), используй {role}. Если нет — можно {id}.
+    //
+    Route::get(   '/settings/roles',               [RolesCtrl::class,'index'])
+        ->middleware(['auth','access:settings,view'])
+        ->name('settings.users.roles.index');
+
+    Route::post(  '/settings/roles',               [RolesCtrl::class,'store'])
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.roles.store');
+
+    Route::patch( '/settings/roles/{role}',        [RolesCtrl::class,'update'])
+        ->whereNumber('role')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.roles.update');
+
+    Route::delete('/settings/roles/{role}',        [RolesCtrl::class,'destroy'])
+        ->whereNumber('role')
+        ->middleware(['auth','access:settings,full'])
+        ->name('settings.users.roles.destroy');
 });

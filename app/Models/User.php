@@ -41,4 +41,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\TaskTimeEntry::class, 'user_id');
     }
+
+    public function accessRole()
+    {
+        return $this->belongsTo(\App\Models\AccessRole::class, 'access_role_id');
+    }
+
 }

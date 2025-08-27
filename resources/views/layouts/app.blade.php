@@ -37,10 +37,13 @@
             <x-nav.link href="{{ route('attributes.index') }}" :active="request()->routeIs('attributes.*')">Атрибуты</x-nav.link>
             <x-nav.link href="{{ route('warehouses.index') }}" :active="request()->routeIs('warehouses.*')">Склады</x-nav.link>
             <x-nav.link href="{{ route('products.index') }}" :active="request()->routeIs('products.*')">Товары</x-nav.link>
-            <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
+            @canAccess('projects', 'full', 'view')
+                <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
+            @endcanAccess
             <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
-            <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки</x-nav.link>
-
+            @canAccess('settings','full')
+                <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки</x-nav.link>
+            @endcanAccess
         </nav>
         <form method="post" action="{{ route('logout') }}" class="p-2 mt-auto">
             @csrf
