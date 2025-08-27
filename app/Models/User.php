@@ -47,4 +47,9 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Models\AccessRole::class, 'access_role_id');
     }
 
+    public function groups()
+    {
+        return $this->belongsToMany(\App\Models\Group::class, 'group_user');
+    }
+
 }

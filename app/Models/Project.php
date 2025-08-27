@@ -13,10 +13,17 @@ class Project extends Model
 {
     use Auditable;
 
-    protected $fillable = [    'name', 'manager_id', 'start_date', 'end_date', 'department', 'note', 'created_by',];
+    protected $fillable = [
+        'name','manager_id','start_date','end_date',
+        'department','note','created_by',
+        'is_private','team_users','team_groups',
+    ];
     protected $casts = [
         'start_date' => 'date',
         'end_date'   => 'date',
+        'is_private' => 'bool',
+        'team_users' => 'array',
+        'team_groups'=> 'array',
     ];
 
     public function manager(): BelongsTo
