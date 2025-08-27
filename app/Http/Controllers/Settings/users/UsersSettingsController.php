@@ -27,6 +27,7 @@ class UsersSettingsController extends Controller
             'phone'    => ['nullable','string','max:32'],
             'company'  => ['nullable','string','max:191'],
             'password' => ['required','string','min:6'],
+            'access_role_id' => ['nullable','integer','exists:access_roles,id'],
         ]);
         $user = UsersSettings::createUser($data);
         return response()->json(['user' => $user], 201);
@@ -40,6 +41,7 @@ class UsersSettingsController extends Controller
             'phone'    => ['nullable','string','max:32'],
             'company'  => ['nullable','string','max:191'],
             'password' => ['nullable','string','min:6'],
+            'access_role_id' => ['nullable','integer','exists:access_roles,id'],
         ]);
         $user = UsersSettings::updateUser($user, $data);
         return response()->json(['user' => $user]);

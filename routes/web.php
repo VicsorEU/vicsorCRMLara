@@ -161,6 +161,8 @@ use App\Http\Controllers\Tasks\TaskTaxonomyController;
 use App\Http\Controllers\SubtaskController;
 use App\Http\Controllers\WorkTimerController;
 use App\Http\Controllers\Settings\users\UsersSettingsController;
+use App\Http\Controllers\Settings\users\RolesController;
+
 
 
 
@@ -247,7 +249,6 @@ Route::middleware('auth')->group(function () {
      */
     Route::prefix('/tasks/{task}')
         ->whereNumber('task')
-        ->middleware('task.lock')
         ->group(function () {
             // Обновление и удаление
             Route::post('/',   [TaskController::class, 'update'])->name('tasks.update');   // фронт шлёт POST
@@ -348,6 +349,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/groups',               [UsersSettingsController::class,'groupsStore'])->name('groups.store');
         Route::patch('/groups/{group}',      [UsersSettingsController::class,'groupsUpdate'])->whereNumber('group')->name('groups.update');
         Route::delete('/groups/{group}',     [UsersSettingsController::class,'groupsDestroy'])->whereNumber('group')->name('groups.destroy');
+        Route::get ('roles',               [RolesController::class,'index'])->name('roles.index');
+        Route::post('roles',               [RolesController::class,'store'])->name('roles.store');
+        Route::patch('roles/{role}',       [RolesController::class,'update'])->name('roles.update');
+        Route::delete('roles/{role}',      [RolesController::class,'destroy'])->name('roles.destroy');
+
     });
 
 });

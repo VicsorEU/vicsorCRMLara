@@ -12,7 +12,7 @@ class UsersSettings
     public static function listUsers()
     {
         return User::query()
-            ->select('id','name','email','phone','company','blocked_at','created_at')
+            ->select('id','name','email','phone','company','blocked_at','created_at','access_role_id')
             ->orderBy('name')
             ->get();
     }
@@ -25,6 +25,7 @@ class UsersSettings
             'phone'    => $data['phone'] ?? null,
             'company'  => $data['company'] ?? null,
             'password' => Hash::make($data['password']),
+            'access_role_id' => $data['access_role_id'] ?? null,
         ];
         return User::create($payload);
     }
@@ -36,6 +37,7 @@ class UsersSettings
             'email'   => $data['email'],
             'phone'   => $data['phone'] ?? null,
             'company' => $data['company'] ?? null,
+            'access_role_id' => $data['access_role_id'] ?? null,
         ]);
         if (!empty($data['password'])) {
             $user->password = Hash::make($data['password']);
