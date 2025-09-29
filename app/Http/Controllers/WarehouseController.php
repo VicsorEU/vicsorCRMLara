@@ -45,13 +45,17 @@ class WarehouseController extends Controller
         return redirect()->route('warehouses.edit',$w)->with('status','Склад создан');
     }
 
-    public function edit(Warehouse $warehouse)
+    public function edit(Warehouse $warehouse, Request $request)
     {
-        return view('warehouses.edit', [
-            'warehouse'=>$warehouse,
-            'parents'  =>Warehouse::where('id','!=',$warehouse->id)->orderBy('name')->get(['id','name']),
-            'managers' =>User::orderBy('name')->get(['id','name']),
-        ]);
+        $section = $request->query('section', 'warehouses');
+        if ( $section !== 'warehouses') {
+            return back();
+        }
+
+        $parents  = Warehouse::where('id','!=',$warehouse->id)->orderBy('name')->get(['id','name']);
+        $managers = User::orderBy('name')->get(['id','name']);
+
+        return view('shops.edit', compact('section', 'warehouse', 'parents', 'managers'));
     }
 
     public function update(UpdateRequest $request, Warehouse $warehouse)

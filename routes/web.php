@@ -13,6 +13,7 @@ require __DIR__.'/web/tasks.php';
 require __DIR__.'/web/timers.php';
 require __DIR__.'/web/files.php';
 require __DIR__.'/web/settings.php';
+require __DIR__.'/web/shops.php';
 
 // при желании: fallback
 // Route::fallback(fn() => abort(404));

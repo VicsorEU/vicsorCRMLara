@@ -33,6 +33,7 @@
         <nav class="p-2 space-y-1">
             <x-nav.link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">Дашборд</x-nav.link>
             <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">Покупатели</x-nav.link>
+            <x-nav.link href="{{ route('shops.index') }}" :active="request()->routeIs('shops.*')">Магазин</x-nav.link>
             <x-nav.link href="{{ route('categories.index') }}" :active="request()->routeIs('categories.*')">Категории</x-nav.link>
             <x-nav.link href="{{ route('attributes.index') }}" :active="request()->routeIs('attributes.*')">Атрибуты</x-nav.link>
             <x-nav.link href="{{ route('warehouses.index') }}" :active="request()->routeIs('warehouses.*')">Склады</x-nav.link>

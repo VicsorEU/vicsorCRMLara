@@ -61,13 +61,17 @@ class AttributeController extends Controller
         return redirect()->route('attributes.edit', $attr)->with('status','Атрибут создан');
     }
 
-    public function edit(ProductAttribute $attribute)
+    public function edit(ProductAttribute $attribute, Request $request)
     {
+        $section = $request->query('section', 'attributes');
+        if ( $section !== 'attributes') {
+            return back();
+        }
+
         $attribute->load('values');
-        return view('attributes.edit', [
-            'attribute'=>$attribute,
-            'parents'  =>ProductAttribute::where('id','!=',$attribute->id)->orderBy('name')->get(['id','name']),
-        ]);
+        $parents = ProductAttribute::where('id','!=',$attribute->id)->orderBy('name')->get(['id','name']);
+
+        return view('shops.edit', compact('section', 'attribute', 'parents'));
     }
 
     public function update(UpdateRequest $request, ProductAttribute $attribute)

@@ -49,12 +49,16 @@ class CategoryController extends Controller
         return redirect()->route('categories.edit', $category)->with('status','Категория создана');
     }
 
-    public function edit(Category $category)
+    public function edit(Category $category, Request $request)
     {
-        return view('categories.edit', [
-            'category'=>$category,
-            'parents' =>Category::where('id','!=',$category->id)->orderBy('name')->get(['id','name']),
-        ]);
+        $section = $request->query('section', 'categories');
+        if ( $section !== 'categories') {
+            return back();
+        }
+
+        $parents = Category::where('id','!=',$category->id)->orderBy('name')->get(['id','name']);
+
+        return view('shops.edit', compact('section', 'category', 'parents'));
     }
 
     public function update(UpdateRequest $request, Category $category)

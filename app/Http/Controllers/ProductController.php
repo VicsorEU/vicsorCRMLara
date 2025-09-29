@@ -127,8 +127,13 @@ class ProductController extends Controller
     }
 
     /** Форма редактирования */
-    public function edit(Product $product): View
+    public function edit(Product $product, Request $request)
     {
+        $section = $request->query('section', 'products');
+        if ( $section !== 'products') {
+            return back();
+        }
+
         $values = \App\Models\AttributeValue::with('attribute')
             ->orderBy('attribute_id')
             ->orderBy('name')
@@ -143,13 +148,7 @@ class ProductController extends Controller
 
         $selectedValueIds = $product->attributeValues->pluck('id')->all();
 
-        return view('products.edit', [
-            'product' => $product,
-            'values'  => $values,
-            'selectedValueIds' => $selectedValueIds,
-            'action'  => route('products.update', $product),
-            'method'  => 'PUT',
-        ]);
+        return view('shops.edit', compact('section', 'product', 'values', 'selectedValueIds'));
     }
 
 

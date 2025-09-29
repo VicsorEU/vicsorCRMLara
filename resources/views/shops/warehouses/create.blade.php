@@ -1,10 +1,7 @@
-@extends('layouts.app')
-@section('title','Новый склад — VicsorCRM')
-@section('page_title','Новый склад')
-
-@section('content')
+<div class="bg-white border rounded-2xl shadow-soft">
+    <div class="px-5 py-3 border-b font-medium">Новый склад</div>
     <x-ui.card class="p-6 max-w-5xl">
-        @include('warehouses._form', [
+        @include('shops.warehouses._form', [
           'warehouse'=>$warehouse,
           'parents'=>$parents,
           'managers'=>$managers,
@@ -12,4 +9,5 @@
           'method'=>'POST',
         ])
     </x-ui.card>
-@endsection
+</div>
+
