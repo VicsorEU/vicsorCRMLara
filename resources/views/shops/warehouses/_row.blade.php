@@ -37,5 +37,5 @@
 </tr>
 
 @foreach($children as $child)
-    @include('warehouses._row', ['node'=>$child, 'groups'=>$groups, 'level'=>$level+1])
+    @include('shops.warehouses._row', ['node'=>$child, 'groups'=>$groups, 'level'=>$level+1])
 @endforeach

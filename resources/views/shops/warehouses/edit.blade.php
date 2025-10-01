@@ -1,7 +1,5 @@
-{{--@extends('layouts.app')--}}
-{{--@section('title','Редактировать склад — VicsorCRM')--}}
-{{--@section('page_title','Редактировать склад')--}}
-{{--@section('page_actions')--}}
+<div class="bg-white border rounded-2xl shadow-soft">
+    <h1 class="mb-4 text-2xl font-semibold">Редактировать склад</h1>
     <form method="post" action="{{ route('warehouses.destroy',$warehouse) }}"
           onsubmit="return confirm('Удалить склад?');">
         @csrf @method('DELETE')
@@ -17,3 +15,4 @@
           'method'=>'PUT',
         ])
     </x-ui.card>
+</div>
