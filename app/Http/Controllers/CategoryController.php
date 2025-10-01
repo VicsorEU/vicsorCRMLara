@@ -5,11 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Http\Requests\Category\StoreRequest;
 use App\Http\Requests\Category\UpdateRequest;
+use App\Services\Categories\CategoryInterface;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
 {
+    protected CategoryInterface $categoryService;
+
+    public function __construct(CategoryInterface $categoryService)
+    {
+        $this->categoryService = $categoryService;
+    }
+
     public function index(Request $r)
     {
         $items = Category::query()
@@ -29,72 +37,71 @@ class CategoryController extends Controller
         ]);
     }
 
-    public function store(StoreRequest $request)
+    /**
+     * @param StoreRequest $request
+     *
+     * @return RedirectResponse
+     */
+    public function store(StoreRequest $request): RedirectResponse
     {
-        $data = $request->validated();
-
-        $imagePath = null;
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('categories', 'public');
+        $res = $this->categoryService->store($request);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
         }
 
-        $category = Category::create([
-            'name'        => $data['name'],
-            'slug'        => $data['slug'],
-            'description' => $data['description'] ?? null,
-            'parent_id'   => $data['parent_id'] ?? null,
-            'image_path'  => $imagePath,
+        return redirect()
+            ->route('shops.category.edit', ['section' => 'categories', 'category' => $res['category']])
+            ->with('status','Категория создана');
+    }
+
+    /**
+     * @param Category $category
+     * @param Request $request
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application|RedirectResponse|object
+     */
+    public function edit(Category $category, Request $request): mixed
+    {
+        $res = $this->categoryService->edit($category, $request);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
+        }
+
+        return view('shops.edit', [
+            'section'  => $res['section'],
+            'category' => $category->refresh(),
+            'parents'  => $res['parents'],
         ]);
-
-        return redirect()->route('categories.edit', $category)->with('status','Категория создана');
     }
 
-    public function edit(Category $category, Request $request)
+    /**
+     * @param Category $category
+     * @param UpdateRequest $request
+     *
+     * @return RedirectResponse
+     */
+    public function update(Category $category, UpdateRequest $request): RedirectResponse
     {
-        $section = $request->query('section', 'categories');
-        if ( $section !== 'categories') {
-            return back();
+        $res = $this->categoryService->update($category, $request);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
         }
 
-        $parents = Category::where('id','!=',$category->id)->orderBy('name')->get(['id','name']);
-
-        return view('shops.edit', compact('section', 'category', 'parents'));
+        return redirect()->route('shops.category.edit', ['section' => 'categories', 'category' => $category])->with('status','Сохранено');
     }
 
-    public function update(UpdateRequest $request, Category $category)
+    /**
+     * @param Category $category
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function destroy(Category $category): RedirectResponse
     {
-        $data = $request->validated();
-
-        // удаление изображения по флажку
-        if ($request->boolean('remove_image') && $category->image_path) {
-            Storage::disk('public')->delete($category->image_path);
-            $category->image_path = null;
+        $res = $this->categoryService->destroy($category);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
         }
 
-        // замена изображения
-        if ($request->hasFile('image')) {
-            if ($category->image_path) {
-                Storage::disk('public')->delete($category->image_path);
-            }
-            $category->image_path = $request->file('image')->store('categories', 'public');
-        }
-
-        $category->fill([
-            'name'        => $data['name'],
-            'slug'        => $data['slug'],
-            'description' => $data['description'] ?? null,
-            'parent_id'   => $data['parent_id'] ?? null,
-        ])->save();
-
-        return redirect()->route('categories.edit',$category)->with('status','Сохранено');
-    }
-
-    public function destroy(Category $category)
-    {
-        if ($category->image_path) {
-            Storage::disk('public')->delete($category->image_path);
-        }
-        $category->delete();
-        return redirect()->route('categories.index')->with('status','Категория удалена');
+        return redirect()->route('shops.index', ['section' => 'categories'])->with('status','Категория удалена');
     }
 }

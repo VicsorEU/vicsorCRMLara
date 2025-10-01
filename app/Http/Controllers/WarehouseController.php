@@ -6,10 +6,18 @@ use App\Models\Warehouse;
 use App\Models\User;
 use App\Http\Requests\Warehouse\StoreRequest;
 use App\Http\Requests\Warehouse\UpdateRequest;
+use App\Services\Warehouses\WarehouseInterface;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class WarehouseController extends Controller
 {
+    protected WarehouseInterface $warehouseService;
+
+    public function __construct(WarehouseInterface $warehouseService)
+    {
+        $this->warehouseService = $warehouseService;
+    }
     public function index(Request $r)
     {
         // забираем все, чтобы построить дерево на фронте
@@ -39,37 +47,84 @@ class WarehouseController extends Controller
         ]);
     }
 
-    public function store(StoreRequest $request)
+    /**
+     * @param StoreRequest $request
+     *
+     * @return RedirectResponse
+     */
+    public function store(StoreRequest $request): RedirectResponse
     {
-        $w = Warehouse::create($request->validated());
-        return redirect()->route('warehouses.edit',$w)->with('status','Склад создан');
-    }
+        $data = $request->validated();
 
-    public function edit(Warehouse $warehouse, Request $request)
-    {
-        $section = $request->query('section', 'warehouses');
-        if ( $section !== 'warehouses') {
-            return back();
+        $res = $this->warehouseService->store($data);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
         }
 
-        $parents  = Warehouse::where('id','!=',$warehouse->id)->orderBy('name')->get(['id','name']);
-        $managers = User::orderBy('name')->get(['id','name']);
-
-        return view('shops.edit', compact('section', 'warehouse', 'parents', 'managers'));
+        return redirect()
+            ->route('shops.warehouse.edit', [
+                'section' => 'warehouses',
+                'warehouse' => $res['warehouse'],
+            ])
+            ->with('status','Склад создан');
     }
 
-    public function update(UpdateRequest $request, Warehouse $warehouse)
+    /**
+     * @param Warehouse $warehouse
+     * @param Request $request
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application|RedirectResponse|object
+     */
+    public function edit(Warehouse $warehouse, Request $request): mixed
     {
-        $warehouse->update($request->validated());
-        return redirect()->route('warehouses.edit',$warehouse)->with('status','Сохранено');
-    }
-
-    public function destroy(Warehouse $warehouse)
-    {
-        if ($warehouse->children()->exists()) {
-            return back()->withErrors('Нельзя удалить склад с подскладами.');
+        $res = $this->warehouseService->edit($warehouse, $request);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
         }
-        $warehouse->delete();
-        return redirect()->route('warehouses.index')->with('status','Удалено');
+
+        return view('shops.edit', [
+            'section'   => $res['section'],
+            'warehouse' => $res['warehouse'],
+            'parents'   => $res['parents'],
+            'managers'  => $res['managers'],
+        ]);
+    }
+
+    /**
+     * @param UpdateRequest $request
+     * @param Warehouse $warehouse
+     *
+     * @return RedirectResponse
+     */
+    public function update(UpdateRequest $request, Warehouse $warehouse): RedirectResponse
+    {
+        $data = $request->validated();
+
+        $res = $this->warehouseService->update($warehouse, $data);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
+        }
+
+        return redirect()
+            ->route('shops.warehouse.edit', [
+                'section' => 'warehouses',
+                'warehouse' => $warehouse->fresh(),
+            ])
+            ->with('status','Сохранено');
+    }
+
+    /**
+     * @param Warehouse $warehouse
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function destroy(Warehouse $warehouse): RedirectResponse
+    {
+        $res = $this->warehouseService->destroy($warehouse);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
+        }
+
+        return redirect()->route('shops.index', ['section' => 'warehouses'])->with('status','Удалено');
     }
 }

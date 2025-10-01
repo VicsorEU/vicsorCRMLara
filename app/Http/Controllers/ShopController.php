@@ -22,10 +22,11 @@ class ShopController extends Controller
             $section = 'products';
         }
 
-        switch ($section) {
+        $items = null;
 
+        switch ($section) {
             case 'products':
-                $products = Product::query()
+                $items = Product::query()
                     ->when($search, fn($query) => $query
                         ->where('name', 'ilike', "%{$search}%")
                         ->orWhere('sku', 'ilike', "%{$search}%")
@@ -36,8 +37,7 @@ class ShopController extends Controller
                     ->orderByDesc('id')
                     ->paginate(20)
                     ->withQueryString();
-
-                return view('shops.index', compact('section', 'products', 'search'));
+                break;
 
             case 'attributes':
                 $items = ProductAttribute::query()
@@ -50,8 +50,7 @@ class ShopController extends Controller
                     ->orderBy('name')
                     ->paginate(15)
                     ->withQueryString();
-
-                return view('shops.index', compact('section', 'items', 'search'));
+                break;
 
             case 'warehouses':
                 $items = Warehouse::query()
@@ -67,8 +66,7 @@ class ShopController extends Controller
                         str_contains(mb_strtolower($w->code), $searchLower)
                     );
                 }
-
-                return view('shops.index', compact('section', 'items', 'search'));
+                break;
 
             case 'categories':
                 $items = Category::query()
@@ -80,11 +78,10 @@ class ShopController extends Controller
                     ->orderBy('name')
                     ->paginate(15)
                     ->withQueryString();
-
-                return view('shops.index', compact('section', 'items', 'search'));
+                break;
         }
 
-        return view('shops.index', compact('section'));
+        return view('shops.index', compact('section', 'items', 'search'));
     }
 
     public function create(Request $request)

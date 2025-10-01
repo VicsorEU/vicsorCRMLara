@@ -7,6 +7,7 @@ use App\Http\Requests\Product\UpdateRequest;
 use App\Models\AttributeValue;
 use App\Models\Product;
 use App\Models\ProductImage;
+use App\Services\Products\ProductInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,12 @@ use Illuminate\View\View;
 
 class ProductController extends Controller
 {
+    protected ProductInterface $productService;
+
+    public function __construct(ProductInterface $productService)
+    {
+        $this->productService = $productService;
+    }
     /** Список товаров */
     public function index(Request $request): View
     {
@@ -57,103 +64,33 @@ class ProductController extends Controller
     {
         $data = $request->validated();
 
-        DB::transaction(function () use ($data, &$product) {
-            $product = Product::create([
-                'is_variable'       => (bool)($data['is_variable'] ?? false),
-                'name'              => $data['name'],
-                'slug'              => $data['slug'],
-                'sku'               => $data['sku'] ?? null,
-                'barcode'           => $data['barcode'] ?? null,
-                'price_regular'     => $data['price_regular'],
-                'price_sale'        => $data['price_sale'] ?? null,
-                'weight'            => $data['weight'] ?? null,
-                'length'            => $data['length'] ?? null,
-                'width'             => $data['width'] ?? null,
-                'height'            => $data['height'] ?? null,
-                'short_description' => $data['short_description'] ?? null,
-                'description'       => $data['description'] ?? null,
-            ]);
+        $res = $this->productService->store($data);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
+        }
 
-            // Картинки товара
-            foreach (($data['images'] ?? []) as $img) {
-                ProductImage::whereKey($img['id'])->update([
-                    'product_id'   => $product->id,
-                    'variation_id' => null,
-                    'is_primary'   => !empty($img['is_primary']),
-                ]);
-            }
-
-            if (empty($data['is_variable'])) {
-                // Простой товар — сохраняем attribute_values
-                $valueIds = collect($data['attr_pairs'] ?? [])
-                    ->pluck('value_id')->filter()->unique()->values()->all();
-
-                $product->attributeValues()->sync($valueIds);
-
-                $actual = $product->attributeValues()->pluck('attribute_values.id')->all();
-            } else {
-                // Вариативный — создаём вариации
-                foreach ($data['variations'] ?? [] as $raw) {
-                    $variation = $product->variations()->create([
-                        'sku'           => $raw['sku'] ?? null,
-                        'barcode'       => $raw['barcode'] ?? null,
-                        'price_regular' => $raw['price_regular'] ?? 0,
-                        'price_sale'    => $raw['price_sale'] ?? null,
-                        'weight'        => $raw['weight'] ?? null,
-                        'length'        => $raw['length'] ?? null,
-                        'width'         => $raw['width'] ?? null,
-                        'height'        => $raw['height'] ?? null,
-                        'description'   => $raw['description'] ?? null,
-                    ]);
-
-                    $vValueIds = collect($raw['pairs'] ?? [])
-                        ->pluck('value_id')->filter()->unique()->values()->all();
-
-                    $variation->values()->sync($vValueIds);
-
-
-                    if (!empty($raw['image_id'])) {
-                        ProductImage::whereKey($raw['image_id'])->update([
-                            'product_id'   => $product->id,
-                            'variation_id' => $variation->id,
-                            'is_primary'   => false,
-                        ]);
-                    }
-                }
-            }
-        });
-
-        return redirect()->route('products.edit', $product)->with('success', 'Товар создан');
+        return redirect()->route('shops.product.edit', ['section' => 'products', 'product' => $res['product']])->with('success', 'Товар создан');
     }
 
     /** Форма редактирования */
     public function edit(Product $product, Request $request)
     {
-        $section = $request->query('section', 'products');
-        if ( $section !== 'products') {
-            return back();
+        $res = $this->productService->edit($product, $request);
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
         }
 
-        $values = \App\Models\AttributeValue::with('attribute')
-            ->orderBy('attribute_id')
-            ->orderBy('name')
-            ->get();
-
-        $product->load([
-            'images',
-            'attributeValues.attribute',
-            'variations.values.attribute',
-            'variations.image',
+        return view('shops.edit', [
+            'section' => $res['section'],
+            'product' => $res['product'],
+            'values' => $res['values'],
+            'selectedValueIds' => $res['selectedValueIds'],
         ]);
-
-        $selectedValueIds = $product->attributeValues->pluck('id')->all();
-
-        return view('shops.edit', compact('section', 'product', 'values', 'selectedValueIds'));
     }
 
 
     /** Обновление */
-    public function update(UpdateRequest $request, Product $product): RedirectResponse
+    public function update(Product $product, UpdateRequest $request)
     {
         $data = $request->validated();
 
