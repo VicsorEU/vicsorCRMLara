@@ -9,7 +9,10 @@ use App\Models\ProductAttribute;
 use App\Models\User;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\View;
 
 class ShopService implements ShopInterface
 {
@@ -93,6 +96,38 @@ class ShopService implements ShopInterface
             'search' => $search,
         ];
     }
+
+    /**
+     * @param string $section
+     * @param Collection $items
+     *
+     * @return string
+     */
+    public function renderTable(string $section, $items): string
+    {
+        $itemsCollection = $items instanceof LengthAwarePaginator ? collect($items->items()) : $items;
+
+        switch ($section) {
+            case 'warehouses':
+                $groups = $itemsCollection->groupBy(fn($w) => $w->parent_id ?? 0);
+                $roots  = $groups->get(0, collect());
+                return view('shops.warehouses._table', compact('roots', 'groups'))->render();
+
+            case 'products':
+                // передаємо сам пагінатор у Blade, щоб працювала пагінація
+                return view('shops.products._table', ['items' => $items])->render();
+
+            case 'categories':
+                return view('shops.categories._table', ['items' => $items])->render();
+
+            case 'attributes':
+                return view('shops.attributes._table', ['items' => $items])->render();
+
+            default:
+                return '<div class="text-red-500">Раздел не найден</div>';
+        }
+    }
+
 
     /**
      * @param Request $request

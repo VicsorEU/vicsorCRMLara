@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Shops\ShopInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ShopController extends Controller
@@ -25,8 +26,23 @@ class ShopController extends Controller
 
         return view('shops.index', [
             'section' => $res['section'],
-            'items'   => $res['items'],
-            'search'  => $res['search'],
+            'items' => $res['items'],
+            'search' => $res['search'],
+        ]);
+    }
+
+    /**
+     * @param Request $reques
+     *
+     * @return JsonResponse
+     */
+    public function indexAjax(Request $request): JsonResponse
+    {
+        $res = $this->shopService->index($request);
+
+        return response()->json([
+            'success' => true,
+            'html'    => $this->shopService->renderTable($res['section'], $res['items']),
         ]);
     }
 
@@ -35,7 +51,8 @@ class ShopController extends Controller
      *
      * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application|\Illuminate\Http\RedirectResponse|object
      */
-    public function create(Request $request): mixed
+    public
+    function create(Request $request): mixed
     {
         $res = $this->shopService->create($request);
 

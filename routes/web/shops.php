@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth')->group(function () {
     Route::group(['prefix' => 'shops'], function () {
         Route::get('/', [ShopController::class,'index'])->name('shops.index');
+        Route::get('/ajax', [ShopController::class,'indexAjax'])->name('shops.index_ajax');
         Route::get('/create', [ShopController::class, 'create'])->name('shops.create');
 
         Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('shops.product.edit');
