@@ -74,7 +74,7 @@
 
     <div class="flex gap-2">
         <x-ui.button type="submit">Сохранить</x-ui.button>
-        <a href="{{ route('categories.index') }}" class="px-4 py-2 rounded-xl border">Отмена</a>
+        <a href="{{ route('shops.index', ['section' => 'category']) }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
 

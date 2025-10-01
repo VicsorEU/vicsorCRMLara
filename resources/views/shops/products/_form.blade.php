@@ -17,7 +17,7 @@
     $theMethod = $method ?? ($product->exists ? 'PUT' : 'POST');
 @endphp
 
-<form method="post" action="{{ $theAction }}"
+<form method="{{ $theMethod }}" action="{{ $theAction }}"
       x-data="productForm({
         is_variable: @js(old('is_variable', (bool)$product->is_variable)),
         images: @js( (old('images') ?? $product->images?->map(fn($i)=>['id'=>$i->id,'url'=>asset('storage/'.$i->path),'is_primary'=>$i->is_primary])->values() ?? []) ),
@@ -261,7 +261,7 @@
 
     <div class="flex gap-2">
         <button class="px-4 py-2 rounded-xl bg-black text-white">Сохранить</button>
-        <a href="{{ route('products.index') }}" class="px-4 py-2 rounded-xl border">Отмена</a>
+        <a href="{{ route('shops.index', ['section' => 'products']) }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
 

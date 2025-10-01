@@ -12,7 +12,7 @@
         </tr>
         </thead>
         <tbody>
-        @forelse ($products as $p)
+        @forelse ($items as $p)
             @php
                 $primary = $p->images->firstWhere('is_primary', true) ?? $p->images->first();
             @endphp
@@ -63,5 +63,5 @@
 </div>
 
 <div class="mt-4">
-    {{ $products->links() }}
+    {{ $items->links() }}
 </div>
