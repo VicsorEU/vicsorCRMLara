@@ -2,118 +2,47 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AttributeValue;
-use App\Models\Category;
-use App\Models\Product;
-use App\Models\ProductAttribute;
-use App\Models\User;
-use App\Models\Warehouse;
+use App\Services\Shops\ShopInterface;
 use Illuminate\Http\Request;
 
 class ShopController extends Controller
 {
-    public function index(Request $request)
+    protected ShopInterface $shopService;
+
+    public function __construct(ShopInterface $shopService)
     {
-        $section = $request->query('section', 'products');
-        $search = trim((string)$request->get('search'));
-
-        $allowedSections = ['categories', 'attributes', 'warehouses', 'products'];
-        if (!in_array($section, $allowedSections, true)) {
-            $section = 'products';
-        }
-
-        $items = null;
-
-        switch ($section) {
-            case 'products':
-                $items = Product::query()
-                    ->when($search, fn($query) => $query
-                        ->where('name', 'ilike', "%{$search}%")
-                        ->orWhere('sku', 'ilike', "%{$search}%")
-                        ->orWhere('slug', 'ilike', "%{$search}%")
-                    )
-                    ->with(['images' => fn($q) => $q->orderByDesc('is_primary')->orderBy('sort_order')])
-                    ->withCount('variations')
-                    ->orderByDesc('id')
-                    ->paginate(20)
-                    ->withQueryString();
-                break;
-
-            case 'attributes':
-                $items = ProductAttribute::query()
-                    ->withCount('values')
-                    ->with('parent:id,name')
-                    ->when($search, fn($q, $s) => $q
-                        ->where('name', 'ILIKE', "%$s%")
-                        ->orWhere('slug', 'ILIKE', "%$s%")
-                    )
-                    ->orderBy('name')
-                    ->paginate(15)
-                    ->withQueryString();
-                break;
-
-            case 'warehouses':
-                $items = Warehouse::query()
-                    ->withCount('children')
-                    ->orderBy('parent_id')
-                    ->orderBy('sort_order')
-                    ->orderBy('name')
-                    ->get();
-
-                if ($search !== '') {
-                    $searchLower = mb_strtolower($search);
-                    $items = $items->filter(fn($w) => str_contains(mb_strtolower($w->name), $searchLower) ||
-                        str_contains(mb_strtolower($w->code), $searchLower)
-                    );
-                }
-                break;
-
-            case 'categories':
-                $items = Category::query()
-                    ->with('parent:id,name')
-                    ->when($search, fn($q, $s) => $q
-                        ->where('name', 'ILIKE', "%$s%")
-                        ->orWhere('slug', 'ILIKE', "%$s%")
-                    )
-                    ->orderBy('name')
-                    ->paginate(15)
-                    ->withQueryString();
-                break;
-        }
-
-        return view('shops.index', compact('section', 'items', 'search'));
+        $this->shopService = $shopService;
     }
 
-    public function create(Request $request)
+    /**
+     * @param Request $request
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application|object
+     */
+    public function index(Request $request): mixed
     {
-        $section = $request->query('section', 'products');
+        $res = $this->shopService->index($request);
 
-        switch ($section) {
-            case 'category':
-                $category = new Category();
-                $parents = Category::orderBy('name')->get(['id', 'name']);
+        return view('shops.index', [
+            'section' => $res['section'],
+            'items'   => $res['items'],
+            'search'  => $res['search'],
+        ]);
+    }
 
-                return view('shops.create', compact('section', 'category', 'parents'));
+    /**
+     * @param Request $request
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View|\Illuminate\Foundation\Application|\Illuminate\Http\RedirectResponse|object
+     */
+    public function create(Request $request): mixed
+    {
+        $res = $this->shopService->create($request);
 
-            case 'attribute':
-                $attribute = new ProductAttribute();
-                $parents = ProductAttribute::orderBy('name')->get(['id', 'name']);
-
-                return view('shops.create', compact('section', 'attribute', 'parents'));
-
-            case 'warehouse':
-                $warehouse = new Warehouse();
-                $parents = Warehouse::orderBy('name')->get(['id', 'name']);
-                $managers = User::orderBy('name')->get(['id', 'name']);
-
-                return view('shops.create', compact('section', 'warehouse', 'parents', 'managers'));
-
-            case 'product':
-            default:
-                $product = new Product();
-                $values = AttributeValue::with('attribute')->orderBy('attribute_id')->orderBy('name')->get();
-
-                return view('shops.create', compact('section', 'product', 'values'));
+        if (!$res['success']) {
+            return back()->withErrors($res['message']);
         }
+
+        return view('shops.create', $res);
     }
 }

@@ -2,14 +2,32 @@
 
 namespace App\Services\Products;
 
-use App\Http\Requests\Product\UpdateRequest;
 use App\Models\Product;
 use Illuminate\Http\Request;
 
 interface ProductInterface
 {
-    public function store(array $data);
-    public function edit(Product $product, Request $request);
-    public function update(Product $product, UpdateRequest $request);
+    /**
+     * @param array $data
+     *
+     * @return array
+     */
+    public function store(array $data): array;
+
+    /**
+     * @param Product $product
+     * @param Request $request
+     *
+     * @return array
+     */
+    public function edit(Product $product, Request $request): array;
+
+    /**
+     * @param Product $product
+     * @param array $data
+     *
+     * @return array
+     */
+    public function update(Product $product, array $data): array;
     public function destroy();
 }

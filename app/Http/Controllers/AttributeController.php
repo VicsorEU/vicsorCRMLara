@@ -19,26 +19,14 @@ class AttributeController extends Controller
     {
         $this->attributeService = $attributeService;
     }
-    public function index(Request $r)
+    public function index()
     {
-        $items = ProductAttribute::query()
-            ->withCount('values')
-            ->with('parent:id,name')
-            ->when($r->search, fn($q,$s)=>$q
-                ->where('name','ILIKE',"%$s%")
-                ->orWhere('slug','ILIKE',"%$s%"))
-            ->orderBy('name')
-            ->paginate(15)->withQueryString();
-
-        return view('attributes.index', ['items'=>$items, 'search'=>$r->search]);
+       //
     }
 
     public function create()
     {
-        return view('attributes.create', [
-            'attribute' => new ProductAttribute(),
-            'parents'   => ProductAttribute::orderBy('name')->get(['id','name']),
-        ]);
+     //
     }
 
     /**

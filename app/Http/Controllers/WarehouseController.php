@@ -18,33 +18,14 @@ class WarehouseController extends Controller
     {
         $this->warehouseService = $warehouseService;
     }
-    public function index(Request $r)
+    public function index()
     {
-        // забираем все, чтобы построить дерево на фронте
-        $items = Warehouse::query()
-            ->withCount('children')
-            ->orderBy('parent_id')->orderBy('sort_order')->orderBy('name')
-            ->get();
-
-        // для поиска оставим простую фильтрацию по имени/коду
-        $search = trim((string)$r->search);
-        if ($search !== '') {
-            $items = $items->filter(fn($w) =>
-                str_contains(mb_strtolower($w->name), mb_strtolower($search)) ||
-                str_contains(mb_strtolower($w->code), mb_strtolower($search))
-            );
-        }
-
-        return view('warehouses.index', compact('items','search'));
+       //
     }
 
     public function create()
     {
-        return view('warehouses.create', [
-            'warehouse' => new Warehouse(),
-            'parents'   => Warehouse::orderBy('name')->get(['id','name']),
-            'managers'  => User::orderBy('name')->get(['id','name']),
-        ]);
+        //
     }
 
     /**

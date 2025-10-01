@@ -18,23 +18,14 @@ class CategoryController extends Controller
         $this->categoryService = $categoryService;
     }
 
-    public function index(Request $r)
+    public function index()
     {
-        $items = Category::query()
-            ->with('parent:id,name')
-            ->when($r->search, fn($q,$s)=>$q->where('name','ILIKE',"%$s%")->orWhere('slug','ILIKE',"%$s%"))
-            ->orderBy('name')
-            ->paginate(15)->withQueryString();
-
-        return view('categories.index', ['items'=>$items, 'search'=>$r->search]);
+     //
     }
 
     public function create()
     {
-        return view('categories.create', [
-            'category' => new Category(),
-            'parents'  => Category::orderBy('name')->get(['id','name']),
-        ]);
+      //
     }
 
     /**
