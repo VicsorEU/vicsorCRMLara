@@ -85,4 +85,20 @@ class ProductController extends Controller
 
         return back()->with('success', 'Товар обновлён');
     }
+
+    public function destroy(Product $product)
+    {
+        $res = $this->productService->destroy($product);
+        if (!$res['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $res['message'],
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Продукт удален успешно',
+        ]);
+    }
 }

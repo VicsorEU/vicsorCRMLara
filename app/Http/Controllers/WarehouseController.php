@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Http\Requests\Warehouse\StoreRequest;
 use App\Http\Requests\Warehouse\UpdateRequest;
 use App\Services\Warehouses\WarehouseInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -97,15 +98,21 @@ class WarehouseController extends Controller
     /**
      * @param Warehouse $warehouse
      *
-     * @return \Illuminate\Http\RedirectResponse
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Warehouse $warehouse): RedirectResponse
+    public function destroy(Warehouse $warehouse): JsonResponse
     {
         $res = $this->warehouseService->destroy($warehouse);
         if (!$res['success']) {
-            return back()->withErrors($res['message']);
+            return response()->json([
+                'success' => false,
+                'message' => $res['message'],
+            ]);
         }
 
-        return redirect()->route('shops.index', ['section' => 'warehouses'])->with('status','Удалено');
+        return response()->json([
+            'success' => true,
+            'message' => 'Склад удален успешно',
+        ]);
     }
 }

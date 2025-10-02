@@ -3,11 +3,11 @@
         <a href="{{ route('shops.create', ['section' => 'warehouse']) }}" class="text-brand-600 hover:underline">+ Новый
             склад</a>
 
-        <form id="searchForm" class="mb-4" method="get">
+        <form id="warehousesSearchForm" class="mb-4" method="get">
             <div class="flex gap-2">
-                <x-ui.input id="searchInput" name="search" value="{{ $search }}" placeholder="Поиск по названию/коду"/>
-                <input id="sectionInput" type="hidden" name="section" value="{{ $section }}">
-                <x-ui.button id="searchButton" variant="light" type="button">Искать</x-ui.button>
+                <x-ui.input id="warehousesSearchInput" name="search" value="{{ $search }}" placeholder="Поиск по названию/коду"/>
+                <input id="warehousesSectionInput" type="hidden" name="section" value="{{ $section }}">
+                <x-ui.button id="warehousesSearchButton" variant="light" type="button">Искать</x-ui.button>
             </div>
         </form>
 
@@ -62,7 +62,7 @@
 
     $(function () {
         let timer = null;
-        const $form = $('#searchForm');
+        const $form = $('#warehousesSearchForm');
         const $input = $('#searchInput');
         const $table = $('#warehousesTable');
 

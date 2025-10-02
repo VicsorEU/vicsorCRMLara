@@ -8,6 +8,7 @@ use App\Models\ProductImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ProductService implements ProductInterface
 {
@@ -273,9 +274,60 @@ class ProductService implements ProductInterface
         }
     }
 
-    public function destroy()
+    /**
+     * @param Product $product
+     *
+     * @return array
+     */
+    public function destroy(Product $product): array
     {
-        // TODO: Implement destroy() method.
-    }
+        try {
+            if (!$product || !$product->exists) {
+                return [
+                    'success' => false,
+                    'message' => 'Товар не знайдено',
+                ];
+            }
 
+            DB::transaction(function () use ($product) {
+                $images = $product->images()->get();
+                foreach ($images as $image) {
+                    if ($image->path && Storage::disk('public')->exists($image->path)) {
+                        Storage::disk('public')->delete($image->path);
+                    }
+                    $image->delete();
+                }
+
+                $variations = $product->variations()->with('values')->get();
+                foreach ($variations as $variation) {
+                    if ($variation->values()->exists()) {
+                        $variation->values()->detach();
+                    }
+                    $variation->delete();
+                }
+
+                if ($product->attributeValues()->exists()) {
+                    $product->attributeValues()->detach();
+                }
+
+                $product->delete();
+            });
+
+            return [
+                'success' => true,
+                'message' => 'Товар успішно видалено',
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Помилка при видаленні товару: ' . $e->getMessage(), [
+                'product_id' => $product->id ?? null,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Помилка при видаленні товару',
+                'error'   => $e->getMessage(),
+            ];
+        }
+    }
 }

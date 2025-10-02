@@ -29,5 +29,11 @@ interface ProductInterface
      * @return array
      */
     public function update(Product $product, array $data): array;
-    public function destroy();
+
+    /**
+     * @param Product $product
+     *
+     * @return array
+     */
+    public function destroy(Product $product): array;
 }

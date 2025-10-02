@@ -7,6 +7,7 @@ use App\Models\AttributeValue;
 use App\Http\Requests\Attribute\StoreRequest;
 use App\Http\Requests\Attribute\UpdateRequest;
 use App\Services\Attributes\AttributeInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,17 +81,24 @@ class AttributeController extends Controller
             ->with('status','Сохранено');
     }
 
-    public function destroy(ProductAttribute $attribute)
+    /**
+     * @param ProductAttribute $attribute
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(ProductAttribute $attribute): JsonResponse
     {
         $res = $this->attributeService->destroy($attribute);
         if (!$res['success']) {
-            return back()->withErrors($res['message']);
+            return response()->json([
+                'success' => false,
+                'message' => $res['message'],
+            ]);
         }
 
-        return redirect()
-            ->route('shops.index', [
-                'section' => 'attributes',
-            ])
-            ->with('status','Удалено');
+        return response()->json([
+            'success' => true,
+            'message' => 'Атрибут удален успешно',
+        ]);
     }
 }
