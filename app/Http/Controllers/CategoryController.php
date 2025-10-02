@@ -32,18 +32,17 @@ class CategoryController extends Controller
     /**
      * @param StoreRequest $request
      *
-     * @return RedirectResponse
+     * @return JsonResponse
      */
-    public function store(StoreRequest $request): RedirectResponse
+    public function store(StoreRequest $request): JsonResponse
     {
         $res = $this->categoryService->store($request);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
 
-        return redirect()
-            ->route('shops.category.edit', ['section' => 'categories', 'category' => $res['category']])
-            ->with('status','Категория создана');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'category' => $res['category'] ?? null,
+        ]);
     }
 
     /**
@@ -70,16 +69,17 @@ class CategoryController extends Controller
      * @param Category $category
      * @param UpdateRequest $request
      *
-     * @return RedirectResponse
+     * @return JsonResponse
      */
-    public function update(Category $category, UpdateRequest $request): RedirectResponse
+    public function update(Category $category, UpdateRequest $request): JsonResponse
     {
         $res = $this->categoryService->update($category, $request);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
 
-        return redirect()->route('shops.category.edit', ['section' => 'categories', 'category' => $category])->with('status','Сохранено');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'category' => $res['category'] ?? null,
+        ]);
     }
 
     /**

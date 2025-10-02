@@ -33,23 +33,19 @@ class AttributeController extends Controller
     /**
      * @param StoreRequest $request
      *
-     * @return \Illuminate\Http\RedirectResponse
+     * @return JsonResponse
      */
-    public function store(StoreRequest $request): RedirectResponse
+    public function store(StoreRequest $request): JsonResponse
     {
         $data = $request->validated();
 
         $res = $this->attributeService->store($data);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
 
-        return redirect()
-            ->route('shops.attribute.edit', [
-                'section' => 'attributes',
-                'attribute' => $res['attribute'],
-            ])
-            ->with('status','Атрибут создан');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'attribute' => $res['attribute'] ?? null,
+        ]);
     }
 
     public function edit(ProductAttribute $attribute, Request $request)
@@ -66,19 +62,21 @@ class AttributeController extends Controller
         ]);
     }
 
-    public function update(ProductAttribute $attribute, UpdateRequest $request)
+    /**
+     * @param ProductAttribute $attribute
+     * @param UpdateRequest $request
+     *
+     * @return JsonResponse
+     */
+    public function update(ProductAttribute $attribute, UpdateRequest $request): JsonResponse
     {
         $res = $this->attributeService->update($attribute, $request);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
 
-        return redirect()
-            ->route('shops.attribute.edit', [
-                'section' => 'attributes',
-                'attribute' => $attribute->refresh(),
-            ])
-            ->with('status','Сохранено');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'attribute' => $res['attribute'] ?? null,
+        ]);
     }
 
     /**

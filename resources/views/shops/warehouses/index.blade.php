@@ -63,17 +63,18 @@
     $(function () {
         let timer = null;
         const $form = $('#warehousesSearchForm');
-        const $input = $('#searchInput');
+        const $input = $('#warehousesSearchInput');
         const $table = $('#warehousesTable');
 
-        function doSearch() {
+        function doSearch(page = 1) {
             const url = '{{ route('shops.index_ajax') }}';
-            const params = $form.serialize();
+            const paramsArray = $form.serializeArray();
+            paramsArray.push({ name: 'page', value: page });
 
             $.ajax({
                 url: url,
                 method: 'GET',
-                data: params,
+                data: $.param(paramsArray),
                 dataType: 'json',
                 beforeSend: function () {
                     $table.addClass('opacity-50 pointer-events-none');
@@ -112,6 +113,14 @@
                 doSearch();
             }
         });
+
+        $(document).on('click', '#warehousesTable .pagination a', function (e) {
+            e.preventDefault();
+            const url = new URL($(this).attr('href'), window.location.origin);
+            const page = url.searchParams.get('page') || 1;
+            doSearch(page);
+        });
     });
+
 </script>
 

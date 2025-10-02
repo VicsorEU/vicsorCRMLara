@@ -1,12 +1,14 @@
 @props(['attribute','parents','action','method'=>'POST'])
 
 <form method="post" action="{{ $action }}"
+      id="attributeForm"
       x-data="attrForm({{ json_encode([
         'rows' => ($attribute->values ?? collect())->map(fn($v)=>[
           'id' => $v->id, 'name' => $v->name, 'slug' => $v->slug, 'sort_order' => $v->sort_order
         ])->values(),
       ]) }})"
-      class="space-y-6">
+      class="space-y-6"
+      data-mode="{{ $attribute->exists ? 'edit' : 'create' }}">
     @csrf
     @if(in_array(strtoupper($method), ['PUT','PATCH','DELETE']))
         @method($method)
@@ -49,9 +51,9 @@
                 </div>
 
                 {{-- сериализация в форму --}}
-                <input type="hidden" :name="`values[${i}][id]`"         :value="row.id ?? ''">
-                <input type="hidden" :name="`values[${i}][name]`"       :value="row.name">
-                <input type="hidden" :name="`values[${i}][slug]`"       :value="row.slug">
+                <input type="hidden" :name="`values[${i}][id]`" :value="row.id ?? ''">
+                <input type="hidden" :name="`values[${i}][name]`" :value="row.name">
+                <input type="hidden" :name="`values[${i}][slug]`" :value="row.slug">
                 <input type="hidden" :name="`values[${i}][sort_order]`" :value="row.sort_order || 0">
             </div>
         </template>
@@ -60,17 +62,72 @@
     </div>
 
     <div class="flex gap-2">
-        <x-ui.button type="submit">Сохранить</x-ui.button>
+        <x-ui.button id="attributeBtnForm" type="button">Сохранить</x-ui.button>
         <a href="{{ route('shops.index', ['section' => 'attribute']) }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
 
 <script>
-    function attrForm(initial){
+    function attrForm(initial) {
         return {
-            rows: (initial.rows || []).map((r,idx)=>({...r, __key: r.id ?? ('n'+idx)})),
-            add(){ this.rows.push({id:null,name:'',slug:'',sort_order:0,__key:'n'+Date.now()}); },
-            remove(i){ this.rows.splice(i,1); },
+            rows: (initial.rows || []).map((r, idx) => ({...r, __key: r.id ?? ('n' + idx)})),
+            add() {
+                this.rows.push({id: null, name: '', slug: '', sort_order: 0, __key: 'n' + Date.now()});
+            },
+            remove(i) {
+                this.rows.splice(i, 1);
+            },
         }
     }
+
+    $(function () {
+        const $form = $('#attributeForm');
+        const $btn = $('#attributeBtnForm');
+
+        $btn.on('click', function (e) {
+            e.preventDefault();
+
+            $.ajax({
+                url: $form.attr('action'),
+                method: $form.attr('method') || 'POST',
+                data: $form.serialize(),
+                dataType: 'json',
+                beforeSend: function () {
+                    $form.find('button[type="submit"]').prop('disabled', true).addClass('opacity-50');
+                },
+                success: function (response) {
+                    if (response.success) {
+                        alert(response.message);
+
+                        if ($form.data('mode') === 'create') {
+
+                            let link = "{{ route('shops.attribute.edit', ['section' => 'attributes', 'attribute' => 'attribute_id']) }}";
+                            link = link.replace('attribute_id', response.attribute.id);
+
+                            window.location.href = link;
+
+                            return;
+                        }
+
+                        if (response.attribute) {
+                            for (const [key, val] of Object.entries(response.attribute)) {
+                                $form.find(`[name="${key}"]`).val(val);
+                            }
+                        }
+
+                    } else {
+                        alert(response.message || 'Помилка');
+                    }
+                },
+                error: function (xhr) {
+                    let msg = 'Помилка AJAX';
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    alert(msg);
+                },
+                complete: function () {
+                    $form.find('button[type="submit"]').prop('disabled', false).removeClass('opacity-50');
+                }
+            });
+        });
+    });
 </script>

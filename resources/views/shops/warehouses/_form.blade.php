@@ -1,6 +1,6 @@
 @props(['warehouse','parents','managers','action','method'=>'POST'])
 
-<form method="post" action="{{ $action }}" class="space-y-6">
+<form id="warehouseForm" method="post" action="{{ $action }}" class="space-y-6" data-mode="{{ $warehouse->exists ? 'edit' : 'create' }}">
     @csrf
     @if(in_array(strtoupper($method), ['PUT','PATCH','DELETE']))
         @method($method)
@@ -74,7 +74,61 @@
     </div>
 
     <div class="flex gap-2">
-        <x-ui.button type="submit">Сохранить</x-ui.button>
+        <x-ui.button id="warehouseBtnForm"  type="button">Сохранить</x-ui.button>
         <a href="{{ route('shops.index', ['section' => 'warehouses']) }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
+
+
+<script>
+    $(function () {
+        const $form = $('#warehouseForm');
+        const $btn = $('#warehouseBtnForm');
+
+        $btn.on('click', function (e) {
+            e.preventDefault();
+
+            $.ajax({
+                url: $form.attr('action'),
+                method: $form.attr('method') || 'POST',
+                data: $form.serialize(),
+                dataType: 'json',
+                beforeSend: function () {
+                    $form.find('button[type="submit"]').prop('disabled', true).addClass('opacity-50');
+                },
+                success: function (response) {
+                    if (response.success) {
+                        alert(response.message);
+
+                        if ($form.data('mode') === 'create') {
+
+                            let link = "{{ route('shops.warehouse.edit', ['section' => 'warehouses', 'warehouse' => 'warehouse_id']) }}";
+                            link = link.replace('warehouse_id', response.warehouse.id);
+
+                            window.location.href = link;
+
+                            return;
+                        }
+
+                        if (response.warehouse) {
+                            for (const [key, val] of Object.entries(response.warehouse)) {
+                                $form.find(`[name="${key}"]`).val(val);
+                            }
+                        }
+
+                    } else {
+                        alert(response.message || 'Помилка');
+                    }
+                },
+                error: function (xhr) {
+                    let msg = 'Помилка AJAX';
+                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    alert(msg);
+                },
+                complete: function () {
+                    $form.find('button[type="submit"]').prop('disabled', false).removeClass('opacity-50');
+                }
+            });
+        });
+    });
+</script>

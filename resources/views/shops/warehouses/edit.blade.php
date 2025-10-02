@@ -40,16 +40,14 @@
                     if (response && response.success) {
                         alert(response.message || 'Склад удален');
 
-                        const params = new URLSearchParams();
+                        const url = new URL(baseUrl, window.location.origin);
+                        url.searchParams.set('section', 'warehouses');
+                        url.searchParams.set('page', 1);
+
                         const searchVal = $searchForm.find('input[name="search"]').val();
-                        const sectionVal = $searchForm.find('input[name="section"]').val();
-                        const pageVal = $searchForm.find('input[name="page"]').val() || 1;
+                        if (searchVal) url.searchParams.set('search', searchVal);
 
-                        if (searchVal) params.append('search', searchVal);
-                        if (sectionVal) params.append('section', sectionVal);
-                        if (pageVal) params.append('page', pageVal);
-
-                        window.location.href = `${baseUrl}?${params.toString()}`;
+                        window.location.href = url.toString();
 
                     } else {
                         alert(response?.message || 'Ошибка при удалении');

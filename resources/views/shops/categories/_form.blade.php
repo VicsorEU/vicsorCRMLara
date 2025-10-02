@@ -1,9 +1,8 @@
 @props(['category','parents','action','method'=>'POST'])
 
-<form method="post" action="{{ $action }}" enctype="multipart/form-data"
-      x-data="catForm({{ json_encode([
-        'currentUrl' => $category->image_url,
-      ]) }})"
+<form id="categoryForm" method="post" action="{{ $action }}" enctype="multipart/form-data"
+      x-data="catForm({{ json_encode(['currentUrl' => $category->image_url]) }})"
+      data-mode="{{ $category->exists ? 'edit' : 'create' }}"
       class="space-y-6">
     @csrf
     @if(in_array(strtoupper($method), ['PUT','PATCH','DELETE']))
@@ -36,7 +35,6 @@
             <div>
                 <x-ui.label>Изображение</x-ui.label>
 
-                {{-- Превью --}}
                 <div class="flex items-start gap-4">
                     <template x-if="previewUrl">
                         <img :src="previewUrl" class="h-28 w-28 object-cover rounded-xl border" alt="preview">
@@ -66,14 +64,13 @@
 
             <div>
                 <x-ui.label>Описание</x-ui.label>
-                <textarea name="description" rows="5" class="w-full rounded-xl border px-3 py-2"
-                >{{ old('description', $category->description) }}</textarea>
+                <textarea name="description" rows="5" class="w-full rounded-xl border px-3 py-2">{{ old('description', $category->description) }}</textarea>
             </div>
         </div>
     </div>
 
     <div class="flex gap-2">
-        <x-ui.button type="submit">Сохранить</x-ui.button>
+        <x-ui.button type="button" id="categoryBtnForm">Сохранить</x-ui.button>
         <a href="{{ route('shops.index', ['section' => 'category']) }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
@@ -100,4 +97,56 @@
             }
         }
     }
+
+    $(function(){
+        const $form = $('#categoryForm');
+        const $btn = $('#categoryBtnForm');
+
+        $btn.on('click', function(e){
+            e.preventDefault();
+
+            let formData = new FormData($form[0]);
+
+            $.ajax({
+                url: $form.attr('action'),
+                method: $form.attr('method') || 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                dataType: 'json',
+                beforeSend: function(){
+                    $btn.prop('disabled', true).addClass('opacity-50');
+                },
+                success: function(response){
+                    if(response.success){
+                        alert(response.message || 'Успіх');
+
+                        if($form.data('mode') === 'create' && response.category){
+                            let link = "{{ route('shops.category.edit', ['section' => 'categories', 'category' => 'category_id']) }}";
+                            link = link.replace('category_id', response.category.id);
+                            window.location.href = link;
+                            return;
+                        }
+
+                        if($form.data('mode') === 'edit' && response.category){
+                            for(const [key,val] of Object.entries(response.category)){
+                                $form.find(`[name="${key}"]`).val(val);
+                            }
+                        }
+
+                    } else {
+                        alert(response.message || 'Помилка');
+                    }
+                },
+                error: function(xhr){
+                    let msg = 'Помилка AJAX';
+                    if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    alert(msg);
+                },
+                complete: function(){
+                    $btn.prop('disabled', false).removeClass('opacity-50');
+                }
+            });
+        });
+    });
 </script>

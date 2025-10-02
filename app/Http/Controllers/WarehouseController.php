@@ -32,23 +32,19 @@ class WarehouseController extends Controller
     /**
      * @param StoreRequest $request
      *
-     * @return RedirectResponse
+     * @return JsonResponse
      */
-    public function store(StoreRequest $request): RedirectResponse
+    public function store(StoreRequest $request): JsonResponse
     {
         $data = $request->validated();
 
         $res = $this->warehouseService->store($data);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
 
-        return redirect()
-            ->route('shops.warehouse.edit', [
-                'section' => 'warehouses',
-                'warehouse' => $res['warehouse'],
-            ])
-            ->with('status','Склад создан');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'warehouse' => $res['warehouse'] ?? null,
+        ]);
     }
 
     /**
@@ -76,23 +72,19 @@ class WarehouseController extends Controller
      * @param UpdateRequest $request
      * @param Warehouse $warehouse
      *
-     * @return RedirectResponse
+     * @return JsonResponse
      */
-    public function update(UpdateRequest $request, Warehouse $warehouse): RedirectResponse
+    public function update(UpdateRequest $request, Warehouse $warehouse): JsonResponse
     {
         $data = $request->validated();
 
         $res = $this->warehouseService->update($warehouse, $data);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
 
-        return redirect()
-            ->route('shops.warehouse.edit', [
-                'section' => 'warehouses',
-                'warehouse' => $warehouse->fresh(),
-            ])
-            ->with('status','Сохранено');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'warehouse' => $res['warehouse'] ?? null,
+        ]);
     }
 
     /**
