@@ -21,6 +21,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/companies-ajax', [CompanyController::class, 'indexAjax'])->name('company.index_ajax');
 
     Route::resource('contacts', ContactController::class);
+    Route::get('/contacts-ajax', [ContactController::class, 'indexAjax'])->name('contact.index_ajax');
+
     Route::resource('customers', CustomerController::class);
     Route::resource('categories', CategoryController::class)->except(['show']);
     Route::resource('attributes', AttributeController::class)->except(['show']);

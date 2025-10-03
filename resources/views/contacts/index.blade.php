@@ -2,38 +2,88 @@
 @section('title','Контакты — VicsorCRM')
 @section('page_title','Контакты')
 @section('page_actions')
-    <a href="{{ route('contacts.create') }}" class="text-brand-600 hover:underline">+ Создать</a>
+    <a href="{{ route('contacts.create') }}" class="text-blue-600 hover:underline">+ Создать</a>
 @endsection
 
 @section('content')
-    <x-ui.card class="p-4">
-        <form method="get" class="mb-4">
-            <div class="flex gap-2">
-                <x-ui.input name="search" value="{{ $search }}" placeholder="Поиск по имени, email, телефону"/>
-                <x-ui.button variant="light">Найти</x-ui.button>
-            </div>
+    <div class="p-4 border rounded-xl shadow" x-data="contactsTable()" x-init="init()">
+
+        <form @submit.prevent="load" class="mb-4 flex gap-2">
+            <input type="text" name="search" x-model="filters.search"
+                   placeholder="Поиск по имени, email, телефону"
+                   class="border rounded-xl px-3 py-2 w-full"
+                   @input.debounce.500ms="load"/>
+            <button type="button" class="px-4 py-2 border rounded-xl bg-gray-100"
+                    @click="load">Найти</button>
         </form>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead><tr class="text-left text-slate-500">
-                    <th class="py-2 pr-4">Имя</th><th class="py-2 pr-4">Компания</th>
-                    <th class="py-2 pr-4">Email</th><th class="py-2 pr-4">Телефон</th><th></th>
-                </tr></thead>
-                <tbody>
-                @foreach($items as $it)
-                    <tr class="border-t">
-                        <td class="py-2 pr-4"><a class="text-brand-600" href="{{ route('contacts.show',$it) }}">{{ $it->full_name }}</a></td>
-                        <td class="py-2 pr-4">{{ optional($it->company)->name ?: '—' }}</td>
-                        <td class="py-2 pr-4">{{ $it->email }}</td>
-                        <td class="py-2 pr-4">{{ $it->phone }}</td>
-                        <td class="py-2 text-right"><a href="{{ route('contacts.edit',$it) }}" class="text-slate-500 hover:text-slate-800">Изм.</a></td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
+        <div class="overflow-x-auto relative">
+            <template x-if="loading">
+                <div class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50 z-10">
+                    <div class="loader">Загрузка...</div>
+                </div>
+            </template>
+            <div id="contactsTable" x-html="tableHtml" @click="handlePagination($event)"></div>
         </div>
+    </div>
 
-        <div class="mt-4">{{ $items->links() }}</div>
-    </x-ui.card>
+    <script>
+        function contactsTable() {
+            return {
+                filters: { search: '{{ request('search') }}' },
+                tableHtml: '',
+                loading: false,
+
+                async load(page = 1, pushState = true) {
+                    this.loading = true;
+                    try {
+                        const params = new URLSearchParams({ ...this.filters, page });
+                        const url = '{{ route('contact.index_ajax') }}?' + params.toString();
+
+                        const response = await fetch(url, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.tableHtml = data.html;
+
+                            if(pushState){
+                                history.pushState(null, '', '{{ route('contacts.index') }}?' + params.toString());
+                            }
+                        } else {
+                            alert(data.message || 'Ошибка при загрузке таблицы');
+                        }
+                    } catch(err) {
+                        alert('Ошибка AJAX: ' + err);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                handlePagination(event) {
+                    const link = event.target.closest('a');
+                    if (!link) return;
+
+                    if (!link.closest('.pagination')) return;
+
+                    event.preventDefault();
+                    const url = new URL(link.href);
+                    const pageParam = url.searchParams.get('page') || 1;
+                    this.load(pageParam);
+                },
+
+                init() {
+                    this.load();
+
+                    window.addEventListener('popstate', () => {
+                        const params = new URLSearchParams(window.location.search);
+                        this.filters.search = params.get('search') || '';
+                        const page = params.get('page') || 1;
+                        this.load(page, false);
+                    });
+                }
+            }
+        }
+    </script>
 @endsection
