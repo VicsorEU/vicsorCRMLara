@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Services\Attributes\AttributeInterface;
 use App\Services\Attributes\AttributeService;
+use App\Services\Audits\AuditInterface;
+use App\Services\Audits\AuditService;
 use App\Services\Categories\CategoryInterface;
 use App\Services\Categories\CategoryService;
 use App\Services\Products\ProductInterface;
@@ -24,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AttributeInterface::class, AttributeService::class);
+        $this->app->bind(AuditInterface::class, AuditService::class);
         $this->app->bind(CategoryInterface::class, CategoryService::class);
         $this->app->bind(ProductInterface::class, ProductService::class);
         $this->app->bind(ShopInterface::class, ShopService::class);

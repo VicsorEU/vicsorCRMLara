@@ -24,6 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('attributes', AttributeController::class)->except(['show']);
     Route::resource('warehouses', WarehouseController::class);
     Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
+    Route::get('/audit-ajax', [AuditController::class, 'indexAjax'])->name('audit.index_ajax');
     Route::resource('products', ProductController::class);
 
     // медиа для товаров

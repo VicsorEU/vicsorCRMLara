@@ -2,39 +2,59 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Audits\AuditInterface;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Activitylog\Models\Activity;
 
 class AuditController extends Controller
 {
-    public function index(Request $r)
+    protected AuditInterface $auditService;
+
+    public function __construct(AuditInterface $auditService)
     {
-        $q = Activity::query()->with('causer');
+        $this->auditService = $auditService;
+    }
 
-        if ($s = trim((string)$r->search)) {
-            $q->where(function($qq) use ($s) {
-                $qq->where('description','ilike',"%$s%")
-                    ->orWhere('log_name','ilike',"%$s%")
-                    ->orWhere('subject_type','ilike',"%$s%")
-                    ->orWhere('subject_id','::text ilike',"%$s%"); // PG: текстовое сравнение
-            });
-        }
-        if ($m = $r->get('model')) {
-            $q->where('subject_type', $m);
-        }
-        if ($e = $r->get('event')) {
-            $q->where('event', $e);
-        }
+    /**
+     * @return View
+     */
+    public function index(): View
+    {
+        $models = Activity::query()
+            ->select('subject_type')
+            ->distinct()
+            ->pluck('subject_type')
+            ->filter()
+            ->values();
 
-        $items = $q->latest()->paginate(20)->withQueryString();
+        return view('audit.index', compact('models'));
+    }
 
-        $models = Activity::query()->select('subject_type')->distinct()->pluck('subject_type')->filter()->values();
+    /**
+     * @param Request $request
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function indexAjax(Request $request): JsonResponse
+    {
+        $res = $this->auditService->renderTable($request);
 
-        return view('audit.index', compact('items','models'));
+        $items = $res['items'];
+        $models = $res['models'];
+
+        $html = view('audit._table', compact('items', 'models'))->render();
+
+        return response()->json([
+            'success' => true,
+            'html' => $html,
+        ]);
     }
 }
 
-function check_platform_auth_status() {
+function check_platform_auth_status()
+{
     $api_url = get_custom_api_url() . 'users/me/';
     $token = isset($_COOKIE['token']) ? sanitize_text_field($_COOKIE['token']) : null;
 
