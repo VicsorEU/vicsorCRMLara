@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Warehouse;
-use App\Models\User;
 use App\Http\Requests\Warehouse\StoreRequest;
 use App\Http\Requests\Warehouse\UpdateRequest;
 use App\Services\Warehouses\WarehouseInterface;
@@ -95,16 +94,10 @@ class WarehouseController extends Controller
     public function destroy(Warehouse $warehouse): JsonResponse
     {
         $res = $this->warehouseService->destroy($warehouse);
-        if (!$res['success']) {
-            return response()->json([
-                'success' => false,
-                'message' => $res['message'],
-            ]);
-        }
 
         return response()->json([
-            'success' => true,
-            'message' => 'Склад удален успешно',
+            'success'   => $res['success'],
+            'message'   => $res['message'],
         ]);
     }
 }

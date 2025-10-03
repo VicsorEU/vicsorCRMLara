@@ -87,16 +87,10 @@ class AttributeController extends Controller
     public function destroy(ProductAttribute $attribute): JsonResponse
     {
         $res = $this->attributeService->destroy($attribute);
-        if (!$res['success']) {
-            return response()->json([
-                'success' => false,
-                'message' => $res['message'],
-            ]);
-        }
 
         return response()->json([
-            'success' => true,
-            'message' => 'Атрибут удален успешно',
+            'success' => $res['success'],
+            'message' => $res['message'],
         ]);
     }
 }

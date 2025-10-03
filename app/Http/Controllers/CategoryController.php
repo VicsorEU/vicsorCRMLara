@@ -90,16 +90,10 @@ class CategoryController extends Controller
     public function destroy(Category $category): JsonResponse
     {
         $res = $this->categoryService->destroy($category);
-        if (!$res['success']) {
-            return response()->json([
-                'success' => false,
-                'message' => $res['message'],
-            ]);
-        }
 
         return response()->json([
-            'success' => true,
-            'message' => 'Категория удален успешно',
+            'success'   => $res['success'],
+            'message'   => $res['message'],
         ]);
     }
 }

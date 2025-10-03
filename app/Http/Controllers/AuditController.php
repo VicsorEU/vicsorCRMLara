@@ -41,14 +41,9 @@ class AuditController extends Controller
     {
         $res = $this->auditService->renderTable($request);
 
-        $items = $res['items'];
-        $models = $res['models'];
-
-        $html = view('audit._table', compact('items', 'models'))->render();
-
         return response()->json([
-            'success' => true,
-            'html' => $html,
+            'success' => $res['success'],
+            'html' => $res['html'],
         ]);
     }
 }

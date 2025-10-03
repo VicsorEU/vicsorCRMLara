@@ -41,10 +41,11 @@ class AuditService implements AuditInterface
         $items = $query->latest()->paginate(20)->withQueryString();
         $models = Activity::query()->select('subject_type')->distinct()->pluck('subject_type')->filter()->values();
 
+        $html = view('audit._table', compact('items', 'models'))->render();
+
         return [
             'success' => true,
-            'items' => $items,
-            'models' => $models,
+            'html' => $html,
         ];
     }
 }
