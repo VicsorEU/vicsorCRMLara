@@ -67,7 +67,8 @@ class ShopService implements ShopInterface
                     ->orderBy('parent_id')
                     ->orderBy('sort_order')
                     ->orderBy('name')
-                    ->get();
+                    ->paginate(15)
+                    ->withQueryString();
 
                 if ($search !== '') {
                     $searchLower = mb_strtolower($search);

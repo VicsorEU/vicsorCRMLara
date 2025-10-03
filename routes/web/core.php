@@ -18,13 +18,17 @@ Route::middleware('auth')->group(function () {
 
     // базовые CRUD
     Route::resource('companies', CompanyController::class);
+    Route::get('/companies-ajax', [CompanyController::class, 'indexAjax'])->name('company.index_ajax');
+
     Route::resource('contacts', ContactController::class);
     Route::resource('customers', CustomerController::class);
     Route::resource('categories', CategoryController::class)->except(['show']);
     Route::resource('attributes', AttributeController::class)->except(['show']);
     Route::resource('warehouses', WarehouseController::class);
+
     Route::get('/audit', [AuditController::class, 'index'])->name('audit.index');
     Route::get('/audit-ajax', [AuditController::class, 'indexAjax'])->name('audit.index_ajax');
+
     Route::resource('products', ProductController::class);
 
     // медиа для товаров

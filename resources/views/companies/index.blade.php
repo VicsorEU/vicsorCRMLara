@@ -6,41 +6,77 @@
 @endsection
 
 @section('content')
-    <x-ui.card class="p-4">
-        <form method="get" class="mb-4">
+    <x-ui.card class="p-4" x-data="companiesTable()" x-init="init()">
+
+        {{-- Фільтр --}}
+        <form @submit.prevent="load" class="mb-4">
             <div class="flex gap-2">
-                <x-ui.input name="search" value="{{ $search }}" placeholder="Поиск по названию, email, телефону"/>
-                <x-ui.button variant="light">Найти</x-ui.button>
+                <x-ui.input
+                    name="search"
+                    x-model="filters.search"
+                    placeholder="Поиск по названию, email, телефону"
+                    @input.debounce.500ms="load"
+                />
+                <x-ui.button variant="light" type="button" @click="load">Найти</x-ui-button>
             </div>
         </form>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead>
-                <tr class="text-left text-slate-500">
-                    <th class="py-2 pr-4">Название</th>
-                    <th class="py-2 pr-4">Контакты</th>
-                    <th class="py-2 pr-4">Email</th>
-                    <th class="py-2 pr-4">Телефон</th>
-                    <th class="py-2 pr-4"></th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($items as $it)
-                    <tr class="border-t">
-                        <td class="py-2 pr-4"><a class="text-brand-600" href="{{ route('companies.show',$it) }}">{{ $it->name }}</a></td>
-                        <td class="py-2 pr-4">{{ $it->contacts_count }}</td>
-                        <td class="py-2 pr-4">{{ $it->email }}</td>
-                        <td class="py-2 pr-4">{{ $it->phone }}</td>
-                        <td class="py-2 text-right">
-                            <a href="{{ route('companies.edit',$it) }}" class="text-slate-500 hover:text-slate-800">Изм.</a>
-                        </td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
+        {{-- Таблиця --}}
+        <div class="overflow-x-auto relative">
+            <template x-if="loading">
+                <div class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-50 z-10">
+                    <div class="loader">Загрузка...</div>
+                </div>
+            </template>
+            <div id="companiesTable" x-html="tableHtml"></div>
         </div>
-
-        <div class="mt-4">{{ $items->links() }}</div>
     </x-ui.card>
+
+    <script>
+        function companiesTable() {
+            return {
+                filters: { search: '{{ request('search') }}' },
+                tableHtml: '',
+                loading: false,
+
+                async load(page = 1) {
+                    this.loading = true;
+                    try {
+                        const params = new URLSearchParams({...this.filters, page});
+                        const response = await fetch('{{ route('company.index_ajax') }}?' + params.toString(), {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.tableHtml = data.html;
+
+                            this.$nextTick(() => {
+                                // Прив’язка пагінації тільки в межах цього компоненту
+                                this.$root.querySelectorAll('#companiesTable .pagination a').forEach(link => {
+                                    link.addEventListener('click', e => {
+                                        e.preventDefault();
+                                        const url = new URL(link.href);
+                                        const pageParam = url.searchParams.get('page') || 1;
+                                        this.load(pageParam);
+                                        history.pushState(null, '', link.href);
+                                    });
+                                });
+                            });
+                        }
+                    } catch (err) {
+                        alert('Ошибка AJAX: ' + err);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                init() {
+                    if (document.getElementById('companiesTable')) {
+                        this.load();
+                    }
+                }
+            }
+        }
+    </script>
 @endsection
