@@ -1,10 +1,17 @@
-@props(['warehouse','parents','managers','action','method'=>'POST'])
+@props(['warehouse','parents','managers','action'])
 
-<form id="warehouseForm" method="post" action="{{ $action }}" class="space-y-6" data-mode="{{ $warehouse->exists ? 'edit' : 'create' }}">
+<form id="warehouseForm" method="post" action="{{ $action }}"
+      x-data="sendForm()"
+      class="space-y-6"
+      data-mode="{{ $warehouse->exists ? 'edit' : 'create' }}">
     @csrf
     @if(in_array(strtoupper($method), ['PUT','PATCH','DELETE']))
         @method($method)
     @endif
+
+    <div x-show="message" x-text="message"
+         :class="{'bg-green-100 text-green-800': type==='success', 'bg-red-100 text-red-800': type==='error'}"
+         class="p-3 rounded-xl mb-4 transition-all" x-transition></div>
 
     <div class="grid md:grid-cols-2 gap-6">
         <div>
@@ -74,61 +81,75 @@
     </div>
 
     <div class="flex gap-2">
-        <x-ui.button id="warehouseBtnForm"  type="button">Сохранить</x-ui.button>
+        <x-ui.button id="warehouseBtnForm" @click="submitForm" type="button">Сохранить</x-ui.button>
         <a href="{{ route('shops.index', ['section' => 'warehouses']) }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
 
 
 <script>
-    $(function () {
-        const $form = $('#warehouseForm');
-        const $btn = $('#warehouseBtnForm');
+    function sendForm() {
+        return {
+            message: '',
+            type: '',
+            loading: false,
+            submitForm() {
+                const form = document.getElementById('warehouseForm');
+                const formData = new FormData(form);
+                const btn = form.querySelector('button[type="button"]');
 
-        $btn.on('click', function (e) {
-            e.preventDefault();
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
 
-            $.ajax({
-                url: $form.attr('action'),
-                method: $form.attr('method') || 'POST',
-                data: $form.serialize(),
-                dataType: 'json',
-                beforeSend: function () {
-                    $form.find('button[type="submit"]').prop('disabled', true).addClass('opacity-50');
-                },
-                success: function (response) {
-                    if (response.success) {
-                        alert(response.message);
+                fetch(form.action, {
+                    method: form.method,
+                    body: formData,
+                    headers: {'X-Requested-With': 'XMLHttpRequest'}
+                })
+                    .then(res => res.json())
+                    .then(response => {
+                        if (response.success) {
+                            this.message = response.message;
+                            this.type = 'success';
 
-                        if ($form.data('mode') === 'create') {
+                            setTimeout(() => {
+                                this.message = '';
+                            }, 3000);
 
-                            let link = "{{ route('shops.warehouse.edit', ['section' => 'warehouses', 'warehouse' => 'warehouse_id']) }}";
-                            link = link.replace('warehouse_id', response.warehouse.id);
-
-                            window.location.href = link;
-
-                            return;
-                        }
-
-                        if (response.warehouse) {
-                            for (const [key, val] of Object.entries(response.warehouse)) {
-                                $form.find(`[name="${key}"]`).val(val);
+                            if (form.dataset.mode === 'create' && response.warehouse) {
+                                let link = "{{ route('shops.warehouse.edit', ['section' => 'warehouses', 'warehouse' => 'warehouse_id']) }}";
+                                link = link.replace('warehouse_id', response.warehouse.id);
+                                window.location.href = link;
+                                return;
                             }
-                        }
 
-                    } else {
-                        alert(response.message || 'Помилка');
-                    }
-                },
-                error: function (xhr) {
-                    let msg = 'Помилка AJAX';
-                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
-                    alert(msg);
-                },
-                complete: function () {
-                    $form.find('button[type="submit"]').prop('disabled', false).removeClass('opacity-50');
-                }
-            });
-        });
-    });
+                            if (form.dataset.mode === 'edit' && response.warehouse) {
+                                for (const [key, val] of Object.entries(response.warehouse)) {
+                                    const el = form.querySelector(`[name="${key}"]`);
+                                    if (el) el.value = val;
+                                }
+                            }
+
+                        } else {
+                            this.message = response.message;
+                            this.type = 'error';
+                            setTimeout(() => {
+                                this.message = '';
+                            }, 3000);
+                        }
+                    })
+                    .catch(err => {
+                        this.message = 'Помилка AJAX';
+                        this.type = 'error';
+                        setTimeout(() => {
+                            this.message = '';
+                        }, 3000);
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
+                    });
+            }
+        }
+    }
 </script>

@@ -17,7 +17,7 @@
     $theMethod = $method ?? ($product->exists ? 'PUT' : 'POST');
 @endphp
 
-<form method="{{ $theMethod }}" action="{{ $theAction }}"
+<form id="productForm" method="post" action="{{ $theAction }}"
       x-data="productForm({
         is_variable: @js(old('is_variable', (bool)$product->is_variable)),
         images: @js( (old('images') ?? $product->images?->map(fn($i)=>['id'=>$i->id,'url'=>asset('storage/'.$i->path),'is_primary'=>$i->is_primary])->values() ?? []) ),
@@ -38,10 +38,16 @@
         attrs: @js($attrsForJs),
       })"
       x-init="init()"
+      data-mode="{{ $product->exists ? 'edit' : 'create' }}"
       class="space-y-8" enctype="multipart/form-data">
 
     @csrf
     @if(in_array(strtoupper($theMethod),['PUT','PATCH','DELETE'])) @method($theMethod) @endif
+
+    <div x-show="message" x-text="message"
+         :class="{'bg-green-100 text-green-800': type==='success', 'bg-red-100 text-red-800': type==='error'}"
+         class="p-3 rounded-xl mb-4 transition-all" x-transition></div>
+
 
     <div class="grid md:grid-cols-2 gap-6">
         <label class="inline-flex items-center gap-2 md:col-span-2">
@@ -260,7 +266,7 @@
     </div>
 
     <div class="flex gap-2">
-        <button class="px-4 py-2 rounded-xl bg-black text-white">Сохранить</button>
+        <button id="productBtnForm" type="button" @click="submitForm()" class="px-4 py-2 rounded-xl bg-black text-white">Сохранить</button>
         <a href="{{ route('shops.index', ['section' => 'products']) }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
@@ -374,6 +380,63 @@
             removeVariationImage(idx){
                 this.variations[idx].image_id = null;
                 this.variations[idx].image_url = null;
+            },
+            submitForm() {
+                const form = document.getElementById('productForm');
+                const formData = new FormData(form);
+                const btn = form.querySelector('button[type="button"]');
+
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+
+                fetch(form.action, {
+                    method: form.method,
+                    body: formData,
+                    headers: {'X-Requested-With': 'XMLHttpRequest'}
+                })
+                    .then(res => res.json())
+                    .then(response => {
+                        if (response.success) {
+                            this.message = response.message;
+                            this.type = 'success';
+
+                            setTimeout(() => {
+                                this.message = '';
+                            }, 3000);
+
+                            if (form.dataset.mode === 'create' && response.product) {
+                                let link = "{{ route('shops.product.edit', ['section' => 'products', 'product' => 'product_id']) }}";
+                                link = link.replace('product_id', response.product.id);
+                                window.location.href = link;
+                                return;
+                            }
+
+                            if (form.dataset.mode === 'edit' && response.product) {
+                                for (const [key, val] of Object.entries(response.product)) {
+                                    const el = form.querySelector(`[name="${key}"]`);
+                                    if (el) el.value = val;
+                                }
+                            }
+
+                        } else {
+                            this.message = response.message;
+                            this.type = 'error';
+                            setTimeout(() => {
+                                this.message = '';
+                            }, 3000);
+                        }
+                    })
+                    .catch(err => {
+                        this.message = err;
+                        this.type = 'error';
+                        setTimeout(() => {
+                            this.message = '';
+                        }, 3000);
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
+                    });
             }
         }
     }

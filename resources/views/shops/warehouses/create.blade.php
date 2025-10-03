@@ -1,5 +1,6 @@
-<div class="bg-white border rounded-2xl shadow-soft">
-    <div class="px-5 py-3 border-b font-medium">Новый склад</div>
+<div class="bg-white border rounded-2xl shadow-soft p-6">
+    <h1 class="mb-4 text-2xl font-semibold">Новый склад</h1>
+
     <x-ui.card class="p-6 max-w-5xl">
         @include('shops.warehouses._form', [
           'warehouse'=>$warehouse,
@@ -10,4 +11,3 @@
         ])
     </x-ui.card>
 </div>
-

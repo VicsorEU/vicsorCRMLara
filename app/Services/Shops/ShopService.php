@@ -80,6 +80,7 @@ class ShopService implements ShopInterface
             case 'categories':
                 $items = Category::query()
                     ->with('parent:id,name')
+                    ->withCount('children')
                     ->when($search, fn($q, $s) => $q
                         ->where('name', 'ILIKE', "%$s%")
                         ->orWhere('slug', 'ILIKE', "%$s%")
@@ -111,14 +112,17 @@ class ShopService implements ShopInterface
             case 'warehouses':
                 $groups = $itemsCollection->groupBy(fn($w) => $w->parent_id ?? 0);
                 $roots  = $groups->get(0, collect());
+
                 return view('shops.warehouses._table', compact('roots', 'groups'))->render();
 
             case 'products':
-                // передаємо сам пагінатор у Blade, щоб працювала пагінація
                 return view('shops.products._table', ['items' => $items])->render();
 
             case 'categories':
-                return view('shops.categories._table', ['items' => $items])->render();
+                $groups = $itemsCollection->groupBy(fn($w) => $w->parent_id ?? 0);
+                $roots  = $groups->get(0, collect());
+
+                return view('shops.categories._table', compact('roots', 'groups'))->render();
 
             case 'attributes':
                 return view('shops.attributes._table', ['items' => $items])->render();

@@ -1,12 +1,12 @@
-<div class="bg-white border rounded-2xl shadow-soft">
+<div x-data="deleteCategory()" class="bg-white border rounded-2xl shadow-soft p-6">
     <h1 class="mb-4 text-2xl font-semibold">Редактировать категорию</h1>
 
-    <form id="deleteCategoryForm" action="{{ route('categories.destroy',$category) }}">
+    <form @submit.prevent="submitForm">
         @csrf
         <x-ui.button variant="light">Удалить</x-ui.button>
     </form>
 
-    <x-ui.card class="p-6 max-w-5xl">
+    <x-ui.card class="p-6 max-w-5xl mt-6">
         @include('shops.categories._form', [
           'category' => $category,
           'parents'  => $parents,
@@ -17,44 +17,54 @@
 </div>
 
 <script>
-    $(function () {
-        const $form = $('#deleteCategoryForm');
-
-        $form.on('submit', function (e) {
-            e.preventDefault();
-
-            if (!confirm('Удалить категорию? Все значения тоже будут удалены.')) {
-                return false;
-            }
-
-            $.ajax({
-                url: $form.attr('action'),
-                type: 'DELETE',
-                data: $form.serialize(),
-                dataType: 'json',
-                beforeSend: function () {
-                    $form.find('button').prop('disabled', true).addClass('opacity-50');
-                },
-                success: function (response) {
-                    if (response && response.success) {
-                        alert(response.message || 'Категория удалена');
-                        // Back to the list of categories
-                        window.location.href = "{{ route('shops.index',['section'=>'categories']) }}";
-                    } else {
-                        alert(response?.message || 'Ошибка при удалении');
-                    }
-                },
-                error: function (xhr) {
-                    let msg = 'Ошибка удаления';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        msg = xhr.responseJSON.message;
-                    }
-                    alert(msg);
-                },
-                complete: function () {
-                    $form.find('button').prop('disabled', false).removeClass('opacity-50');
+    function deleteCategory() {
+        return {
+            message: '',
+            type: '',
+            loading: false,
+            submitForm() {
+                if (!confirm('Удалить категорию? Все значения тоже будут удалены.')) {
+                    return;
                 }
-            });
-        });
-    });
+
+                this.loading = true;
+
+                fetch("{{ route('categories.destroy', $category) }}", {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(res => res.json())
+                    .then(response => {
+                        if (response.success) {
+                            this.message = response.message || 'Категория удалена';
+                            this.type = 'success';
+                            setTimeout(() => {
+                                this.message = '';
+                            }, 3000);
+
+                            window.location.href = "{{ route('shops.index',['section'=>'categories']) }}";
+                        } else {
+                            this.message = response.message || 'Ошибка при удалении';
+                            this.type = 'error';
+                            setTimeout(() => {
+                                this.message = '';
+                            }, 3000);
+                        }
+                    })
+                    .catch(err => {
+                        this.message = 'Ошибка удаления';
+                        this.type = 'error';
+                        setTimeout(() => {
+                            this.message = '';
+                        }, 3000);
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            }
+        }
+    }
 </script>

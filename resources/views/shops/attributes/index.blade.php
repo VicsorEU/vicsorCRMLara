@@ -1,74 +1,61 @@
-<div class="bg-white border rounded-2xl shadow-soft">
+<div class="bg-white border rounded-2xl shadow-soft" x-data="attributesSearch()">
     <x-ui.card class="p-4">
-        <a href="{{ route('shops.create', ['section' => 'attribute']) }}" class="text-brand-600 hover:underline">+ Новый атрибут</a>
+        <div class="mb-4">
+            <a href="{{ route('shops.create', ['section' => 'attribute']) }}" class="text-brand-600 hover:underline">+ Новый атрибут</a>
+        </div>
 
-        <form id="attributesSearchForm" class="mb-4" method="get">
+        <form @submit.prevent="search" class="mb-4">
             <div class="flex gap-2">
-                <x-ui.input id="attributesSearchInput" name="search" value="{{ $search }}"
-                            placeholder="Поиск по названию/слагу"/>
-                <input id="attributesSectionInput" type="hidden" name="section" value="{{ $section }}">
-                <x-ui.button id="attributesSearchButton" variant="light" type="button">Искать</x-ui.button>
+                <x-ui.input
+                    id="attributesSearchInput"
+                    name="search"
+                    placeholder="Поиск по названию/слагу"
+                    x-model="searchTerm"
+                    @input.debounce.400ms="search"
+                />
+                <input type="hidden" name="section" :value="section">
+                <x-ui.button type="button" variant="light" @click="search">Искать</x-ui.button>
             </div>
         </form>
 
-        <div id="attributesTable">
+        <div id="attributesTable" :class="{'opacity-50 pointer-events-none': loading}" x-html="tableHtml">
             @include('shops.attributes._table', ['items' => $items])
         </div>
     </x-ui.card>
 </div>
 
 <script>
-    $(function () {
-        let timer = null;
-        const $form = $('#attributesSearchForm');
-        const $input = $('#attributesSearchInput');
-        const $table = $('#attributesTable');
+    function attributesSearch() {
+        return {
+            searchTerm: '{{ $search }}',
+            section: '{{ $section }}',
+            tableHtml: `@include('shops.attributes._table', ['items' => $items])`,
+            loading: false,
 
-        function doSearch() {
-            const url = '{{ route('shops.index_ajax') }}';
-            const params = $form.serialize();
+            async search() {
+                this.loading = true;
+                try {
+                    const params = new URLSearchParams({
+                        search: this.searchTerm,
+                        section: this.section
+                    });
 
-            $.ajax({
-                url: url,
-                method: 'GET',
-                data: params,
-                dataType: 'json',
-                beforeSend: function () {
-                    $table.addClass('opacity-50 pointer-events-none');
-                },
-                success: function (response) {
-                    if (response && response.success) {
-                        $table.html(response.html);
+                    const response = await fetch('{{ route("shops.index_ajax") }}?' + params.toString(), {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.tableHtml = data.html;
                     } else {
-                        alert(response?.message || 'Ошибка при поиске');
+                        alert(data.message || 'Ошибка при поиске');
                     }
-                },
-                error: function (xhr, status, error) {
-                    alert('Ошибка AJAX: ' + (xhr.status ? xhr.status : status));
-                },
-                complete: function () {
-                    $table.removeClass('opacity-50 pointer-events-none');
+                } catch (err) {
+                    alert('Ошибка AJAX: ' + err);
+                } finally {
+                    this.loading = false;
                 }
-            });
-        }
-
-        $form.on('submit', function (e) {
-            e.preventDefault();
-            clearTimeout(timer);
-            doSearch();
-        });
-
-        $input.on('input', function () {
-            clearTimeout(timer);
-            timer = setTimeout(doSearch, 400);
-        });
-
-        $input.on('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                clearTimeout(timer);
-                doSearch();
             }
-        });
-    });
+        }
+    }
 </script>

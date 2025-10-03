@@ -29,21 +29,17 @@ class ProductController extends Controller
         //
     }
 
-    /**
-     * @param StoreRequest $request
-     *
-     * @return RedirectResponse
-     */
-    public function store(StoreRequest $request): RedirectResponse
+    public function store(StoreRequest $request)
     {
         $data = $request->validated();
 
         $res = $this->productService->store($data);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
 
-        return redirect()->route('shops.product.edit', ['section' => 'products', 'product' => $res['product']])->with('success', 'Товар создан');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'product' => $res['product'] ?? null,
+        ]);
     }
 
     /**
@@ -67,23 +63,17 @@ class ProductController extends Controller
         ]);
     }
 
-
-    /**
-     * @param Product $product
-     * @param UpdateRequest $request
-     *
-     * @return RedirectResponse
-     */
-    public function update(Product $product, UpdateRequest $request): RedirectResponse
+    public function update(Product $product, UpdateRequest $request)
     {
         $data = $request->validated();
 
-        $res = $this->productService->edit($product, $data);
-        if (!$res['success']) {
-            return back()->withErrors($res['message']);
-        }
+        $res = $this->productService->update($product, $data);
 
-        return back()->with('success', 'Товар обновлён');
+        return response()->json([
+            'success'   => $res['success'],
+            'message'   => $res['message'],
+            'product' => $res['product'] ?? null,
+        ]);
     }
 
     public function destroy(Product $product)
