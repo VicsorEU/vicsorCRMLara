@@ -1,12 +1,17 @@
 @props(['customer', 'managers', 'action', 'method' => 'POST'])
 
-<form method="post" action="{{ $action }}"
-      x-data="customerForm({{ json_encode([
+<form
+    method="post"
+    action="{{ $action }}"
+    x-data="customerForm({{ json_encode([
         'channels' => ($customer->channels ?? collect())->map(fn($c)=>['kind'=>$c->kind,'value'=>$c->value])->values(),
-        'tab'      => 'main'
-      ]) }})"
-      class="space-y-6">
-
+        'tab' => 'main'
+    ]) }})"
+    @submit.prevent="submitForm"
+    data-mode="{{ $customer->exists ? 'edit' : 'create' }}"
+    class="space-y-6"
+    id="customerForm"
+>
     @csrf
     @if(in_array(strtoupper($method), ['PUT','PATCH','DELETE']))
         @method($method)
@@ -14,10 +19,10 @@
 
     {{-- Tabs --}}
     <div class="flex gap-1 border-b">
-        <button type="button" :class="btnTab('main')"     @click="tab='main'">Общее</button>
+        <button type="button" :class="btnTab('main')" @click="tab='main'">Общее</button>
         <button type="button" :class="btnTab('channels')" @click="tab='channels'">Каналы</button>
-        <button type="button" :class="btnTab('address')"  @click="tab='address'">Адрес доставки</button>
-        <button type="button" :class="btnTab('extra')"    @click="tab='extra'">Дополнительно</button>
+        <button type="button" :class="btnTab('address')" @click="tab='address'">Адрес доставки</button>
+        <button type="button" :class="btnTab('extra')" @click="tab='extra'">Дополнительно</button>
     </div>
 
     {{-- Общее --}}
@@ -27,39 +32,37 @@
             <x-ui.input name="full_name" value="{{ old('full_name', $customer->full_name) }}" required/>
         </div>
 
-        {{-- Телефоны (множественные) --}}
+        {{-- Телефоны --}}
         <div class="md:col-span-2"
              x-data="{ list: @js(old('phones', $customer->phones?->pluck('value')->all() ?? [])) }">
             <x-ui.label>Телефоны</x-ui.label>
-
             <div class="space-y-2">
-                <template x-for="(v,i) in list" :key="i">
+                <template x-for="(v, i) in list" :key="i">
                     <div class="flex items-center gap-2">
                         <x-ui.input name="phones[]" x-model="list[i]" class="flex-1"/>
-                        <button type="button" class="px-2 py-1 rounded border" @click="list.splice(i,1)">Удалить</button>
+                        <button type="button" class="px-2 py-1 rounded border" @click="list.splice(i, 1)">Удалить
+                        </button>
                     </div>
                 </template>
             </div>
-
             <div class="mt-2">
                 <x-ui.button type="button" @click="list.push('')">+ Добавить телефон</x-ui.button>
             </div>
         </div>
 
-        {{-- E-mail (множественные) --}}
+        {{-- E-mail --}}
         <div class="md:col-span-2"
              x-data="{ list: @js(old('emails', $customer->emails?->pluck('value')->all() ?? [])) }">
             <x-ui.label>E-mail</x-ui.label>
-
             <div class="space-y-2">
-                <template x-for="(v,i) in list" :key="i">
+                <template x-for="(v, i) in list" :key="i">
                     <div class="flex items-center gap-2">
                         <x-ui.input type="email" name="emails[]" x-model="list[i]" class="flex-1"/>
-                        <button type="button" class="px-2 py-1 rounded border" @click="list.splice(i,1)">Удалить</button>
+                        <button type="button" class="px-2 py-1 rounded border" @click="list.splice(i, 1)">Удалить
+                        </button>
                     </div>
                 </template>
             </div>
-
             <div class="mt-2">
                 <x-ui.button type="button" @click="list.push('')">+ Добавить e-mail</x-ui.button>
             </div>
@@ -70,14 +73,16 @@
             <select name="manager_id" class="w-full rounded-xl border px-3 py-2">
                 <option value="">—</option>
                 @foreach($managers as $m)
-                    <option value="{{ $m->id }}" @selected(old('manager_id', $customer->manager_id)==$m->id)>{{ $m->name }}</option>
+                    <option
+                        value="{{ $m->id }}" @selected(old('manager_id', $customer->manager_id)==$m->id)>{{ $m->name }}</option>
                 @endforeach
             </select>
         </div>
 
         <div class="md:col-span-2">
             <x-ui.label>Заметка</x-ui.label>
-            <textarea name="note" class="w-full rounded-xl border px-3 py-2" rows="4">{{ old('note', $customer->note) }}</textarea>
+            <textarea name="note" class="w-full rounded-xl border px-3 py-2"
+                      rows="4">{{ old('note', $customer->note) }}</textarea>
         </div>
     </div>
 
@@ -102,7 +107,7 @@
         </div>
 
         <div class="mt-4">
-            <template x-if="channels.length===0">
+            <template x-if="channels.length === 0">
                 <div class="text-sm text-slate-500">Пока нет каналов</div>
             </template>
 
@@ -113,10 +118,10 @@
                             <span class="font-medium" x-text="label(ch.kind)"></span>:
                             <span x-text="ch.value"></span>
                         </div>
-                        <button type="button" class="text-slate-500 hover:text-red-600" @click="removeChannel(idx)">Удалить</button>
-
-                        {{-- hidden inputs to submit --}}
-                        <input type="hidden" :name="`channels[${idx}][kind]`"  :value="ch.kind">
+                        <button type="button" class="text-slate-500 hover:text-red-600" @click="removeChannel(idx)">
+                            Удалить
+                        </button>
+                        <input type="hidden" :name="`channels[${idx}][kind]`" :value="ch.kind">
                         <input type="hidden" :name="`channels[${idx}][value]`" :value="ch.value">
                     </div>
                 </template>
@@ -124,7 +129,7 @@
         </div>
     </div>
 
-    {{-- Адрес доставки (основной) --}}
+    {{-- Адрес доставки --}}
     <div x-show="tab==='address'" x-cloak class="grid md:grid-cols-2 gap-4">
         @php $addr = old('addr', optional($customer->defaultAddress)->toArray() ?? []); @endphp
 
@@ -158,7 +163,6 @@
         </div>
     </div>
 
-    {{-- Дополнительно --}}
     <div x-show="tab==='extra'" x-cloak class="grid md:grid-cols-2 gap-4">
         <div>
             <x-ui.label>Дата рождения</x-ui.label>
@@ -168,17 +172,18 @@
         {{-- Поле "Страна (доп. поле)" удалено по требованию --}}
     </div>
 
-    {{-- Кнопки (без вложенных форм!) --}}
+    {{-- Кнопки --}}
     <div class="flex gap-2">
-        <x-ui.button type="submit">Сохранить</x-ui.button>
+        <x-ui.button type="submit" id="customerFormBtn">Сохранить</x-ui.button>
         <a href="{{ url()->previous() }}" class="px-4 py-2 rounded-xl border">Отмена</a>
     </div>
 </form>
 
 @isset($customer->id)
-    <form method="post" action="{{ route('customers.destroy', $customer) }}" class="mt-4"
-          onsubmit="return confirm('Удалить покупателя?');">
-        @csrf @method('DELETE')
+    <form x-data="customerDelete('{{ route('customers.destroy', $customer) }}')" @submit.prevent="confirmAndDelete"
+          class="mt-4">
+        @csrf
+        @method('DELETE')
         <x-ui.button variant="light">Удалить</x-ui.button>
     </form>
 @endisset
@@ -188,15 +193,115 @@
         return {
             tab: initial.tab || 'main',
             channels: initial.channels || [],
-            newChannel: {kind:'telegram', value:''},
-            addChannel(){
-                if(!this.newChannel.value.trim()) return;
-                this.channels.push({kind:this.newChannel.kind, value:this.newChannel.value.trim()});
-                this.newChannel.value='';
+            newChannel: {kind: 'telegram', value: ''},
+
+            addChannel() {
+                if (!this.newChannel.value.trim()) return;
+                this.channels.push({kind: this.newChannel.kind, value: this.newChannel.value.trim()});
+                this.newChannel.value = '';
             },
-            removeChannel(i){ this.channels.splice(i,1); },
-            label(k){ return {telegram:'Telegram', viber:'Viber', whatsapp:'WhatsApp', instagram:'Instagram', facebook:'Facebook'}[k] || k; },
-            btnTab(t){ return 'px-3 py-2 text-sm '+(this.tab===t?'border-b-2 border-slate-900 font-medium':'text-slate-500 hover:text-slate-800'); }
-        }
+
+            removeChannel(i) {
+                this.channels.splice(i, 1);
+            },
+
+            label(kind) {
+                return {
+                    telegram: 'Telegram',
+                    viber: 'Viber',
+                    whatsapp: 'WhatsApp',
+                    instagram: 'Instagram',
+                    facebook: 'Facebook'
+                }[kind] || kind;
+            },
+
+            btnTab(tabName) {
+                return 'px-3 py-2 text-sm ' + (this.tab === tabName
+                    ? 'border-b-2 border-slate-900 font-medium'
+                    : 'text-slate-500 hover:text-slate-800');
+            },
+
+            submitForm() {
+                const form = document.getElementById('customerForm');
+                const formData = new FormData(form);
+                const btn = form.querySelector('button[type="button"]');
+
+                btn.disabled = true;
+                btn.classList.add('opacity-50');
+
+                fetch(form.action, {
+                    method: form.method,
+                    body: formData,
+                    headers: {'X-Requested-With': 'XMLHttpRequest'}
+                })
+                    .then(res => res.json())
+                    .then(response => {
+                        if (response.success) {
+                            this.message = response.message;
+                            this.type = 'success';
+
+                            setTimeout(() => this.message = '', 3000);
+
+                            if (form.dataset.mode === 'create' && response.customer) {
+                                let link = "{{ route('customers.show', ['customer' => 'customers_id']) }}";
+                                window.location.href = link.replace('customers_id', response.customer.id);
+                                return;
+                            }
+
+                            if (form.dataset.mode === 'edit' && response.customer) {
+                                window.location.href = response.redirect;
+                            }
+                        } else {
+                            this.message = response.message;
+                            this.type = 'error';
+                            setTimeout(() => this.message = '', 3000);
+                        }
+                    })
+                    .catch(() => {
+                        this.message = 'Помилка AJAX';
+                        this.type = 'error';
+                        setTimeout(() => this.message = '', 3000);
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
+                    });
+            }
+        };
+    }
+
+    function customerDelete(url) {
+        return {
+            loading: false,
+
+            async confirmAndDelete() {
+                if (!confirm('Удалить покупателя?')) return;
+
+                this.loading = true;
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            'Accept': 'application/json'
+                        },
+                        body: new URLSearchParams({'_method': 'DELETE'})
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        alert(data.message || 'Покупатель удален');
+                        window.location.href = data.redirect || '{{ route('customers.index') }}';
+                    } else {
+                        alert(data.message || 'Ошибка при удалении');
+                    }
+                } catch (e) {
+                    alert('Ошибка AJAX: ' + e.message);
+                } finally {
+                    this.loading = false;
+                }
+            }
+        };
     }
 </script>

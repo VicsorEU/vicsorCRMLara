@@ -37,7 +37,6 @@
             <x-nav.link href="{{ route('shops.index') }}" :active="request()->routeIs('shops.*')">Магазин</x-nav.link>
             @canAccess('projects', 'full', 'view')
                 <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
-                <x-nav.link href="{{ route('companies.index') }}" :active="request()->routeIs('companies.*')">Компании</x-nav.link>
             @endcanAccess
             <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
             @canAccess('settings','full')

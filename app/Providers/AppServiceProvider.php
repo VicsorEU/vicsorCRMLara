@@ -12,6 +12,8 @@ use App\Services\Companies\CompanyInterface;
 use App\Services\Companies\CompanyService;
 use App\Services\Contacts\ContactInterface;
 use App\Services\Contacts\ContactService;
+use App\Services\Customer\CustomerInterface;
+use App\Services\Customer\CustomerService;
 use App\Services\Products\ProductInterface;
 use App\Services\Products\ProductService;
 use App\Services\Shops\ShopInterface;
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CategoryInterface::class, CategoryService::class);
         $this->app->bind(CompanyInterface::class, CompanyService::class);
         $this->app->bind(ContactInterface::class, ContactService::class);
+        $this->app->bind(CustomerInterface::class, CustomerService::class);
         $this->app->bind(ProductInterface::class, ProductService::class);
         $this->app->bind(ShopInterface::class, ShopService::class);
         $this->app->bind(WarehouseInterface::class, WarehouseService::class);

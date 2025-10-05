@@ -8,27 +8,48 @@ use App\Models\CustomerChannel;
 use App\Models\User;
 use App\Http\Requests\Customer\StoreRequest;
 use App\Http\Requests\Customer\UpdateRequest;
+use App\Services\Customer\CustomerInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class CustomerController extends Controller
 {
-    public function index(Request $r)
-    {
-        $items = Customer::query()
-            ->with(['manager:id,name','defaultAddress','phones','emails'])
-            ->when($r->search, fn($q,$s)=>$q->where(function($w) use($s){
-                $w->where('full_name','ILIKE',"%$s%")
-                    ->orWhereHas('phones', fn($qq)=>$qq->where('value','ILIKE',"%$s%"))
-                    ->orWhereHas('emails', fn($qq)=>$qq->where('value','ILIKE',"%$s%"));
-            }))
-            ->orderBy('full_name')
-            ->paginate(15)->withQueryString();
+    protected CustomerInterface $customerService;
 
-        return view('customers.index', ['items'=>$items, 'search'=>$r->search]);
+    public function __construct(CustomerInterface $customerService)
+    {
+        $this->customerService = $customerService;
     }
 
-    public function create()
+    /**
+     * @return View
+     */
+    public function index(): View
+    {
+        return view('customers.index');
+    }
+
+    /**
+     * @param Request $request
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function indexAjax(Request $request): JsonResponse
+    {
+        $res = $this->customerService->renderTable($request);
+
+        return response()->json([
+            'success' => $res['success'],
+            'html' => $res['html'],
+        ]);
+    }
+
+    /**
+     * @return View
+     */
+    public function create(): View
     {
         return view('customers.create', [
             'managers' => User::orderBy('name')->get(['id','name']),
@@ -36,106 +57,96 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function store(StoreRequest $r)
+    /**
+     * @param StoreRequest $request
+     *
+     * @return JsonResponse
+     */
+    public function store(StoreRequest $request): JsonResponse
     {
-        $data = $r->validated();
+        $res = $this->customerService->store($request);
 
-        DB::transaction(function() use ($data, &$customer) {
-            $customer = Customer::create([
-                'full_name' => $data['full_name'],
-                'manager_id'=> $data['manager_id'] ?? null,
-                'note'      => $data['note'] ?? null,
-                'birth_date'=> $data['birth_date'] ?? null,
+        if ($res['success']) {
+            return response()->json([
+                'success' => true,
+                'message' => $res['message'],
+                'customer' => $res['customer'],
+                'redirect' => route('customers.show', $res['customer']->id),
             ]);
+        }
 
-            if (!empty($data['addr'])) {
-                CustomerAddress::create(array_merge($data['addr'], [
-                    'customer_id'=>$customer->id, 'is_default'=>true, 'label'=>'Основной',
-                ]));
-            }
-
-            // телефоны
-            foreach (($data['phones'] ?? []) as $v) {
-                $v = trim((string)$v);
-                if ($v !== '') $customer->phones()->create(['value'=>$v]);
-            }
-            // e-mail
-            foreach (($data['emails'] ?? []) as $v) {
-                $v = trim((string)$v);
-                if ($v !== '') $customer->emails()->create(['value'=>$v]);
-            }
-
-            // каналы
-            foreach (($data['channels'] ?? []) as $ch) {
-                if (!strlen(trim($ch['value'] ?? ''))) continue;
-                $customer->channels()->create(['kind'=>$ch['kind'], 'value'=>trim($ch['value'])]);
-            }
-        });
-
-        return redirect()->route('customers.show', $customer)->with('status','Покупатель создан');
+        return response()->json([
+            'success' => false,
+            'message' => $res['message'],
+            'error'   => $res['error'] ?? null,
+        ], 422);
     }
 
-    public function show(Customer $customer)
+    /**
+     * @param Customer $customer
+     *
+     * @return View
+     */
+    public function show(Customer $customer): View
     {
         $customer->load(['manager','channels','addresses']);
+
         return view('customers.show', compact('customer'));
     }
 
-    public function edit(Customer $customer)
+    /**
+     * @param Customer $customer
+     *
+     * @return View
+     */
+    public function edit(Customer $customer): View
     {
         $customer->load(['defaultAddress','channels','phones','emails']);
+
         return view('customers.edit', [
             'customer'=>$customer,
             'managers'=>User::orderBy('name')->get(['id','name']),
         ]);
     }
 
-    public function update(UpdateRequest $r, Customer $customer)
+    /**
+     * @param UpdateRequest $request
+     * @param Customer $customer
+     *
+     * @return JsonResponse
+     */
+    public function update(UpdateRequest $request, Customer $customer): JsonResponse
     {
-        $data = $r->validated();
+        $res = $this->customerService->update($customer, $request);
 
-        DB::transaction(function() use ($customer,$data) {
-            $customer->update([
-                'full_name' => $data['full_name'],
-                'manager_id'=> $data['manager_id'] ?? null,
-                'note'      => $data['note'] ?? null,
-                'birth_date'=> $data['birth_date'] ?? null,
+        if ($res['success']) {
+            return response()->json([
+                'success' => true,
+                'message' => $res['message'],
+                'customer' => $res['customer'],
+                'redirect' => route('customers.show', $res['customer']->id),
             ]);
+        }
 
-            if (!empty($data['addr'])) {
-                $addr = $customer->defaultAddress()->first();
-                $addr ? $addr->update($data['addr'])
-                    : CustomerAddress::create(array_merge($data['addr'], [
-                    'customer_id'=>$customer->id,'is_default'=>true,'label'=>'Основной',
-                ]));
-            }
-
-            // пересобираем телефоны/почты
-            $customer->phones()->delete();
-            foreach (($data['phones'] ?? []) as $v) {
-                $v = trim((string)$v);
-                if ($v !== '') $customer->phones()->create(['value'=>$v]);
-            }
-
-            $customer->emails()->delete();
-            foreach (($data['emails'] ?? []) as $v) {
-                $v = trim((string)$v);
-                if ($v !== '') $customer->emails()->create(['value'=>$v]);
-            }
-
-            $customer->channels()->delete();
-            foreach (($data['channels'] ?? []) as $ch) {
-                if (!strlen(trim($ch['value'] ?? ''))) continue;
-                $customer->channels()->create(['kind'=>$ch['kind'],'value'=>trim($ch['value'])]);
-            }
-        });
-
-        return redirect()->route('customers.show',$customer)->with('status','Сохранено');
+        return response()->json([
+            'success' => false,
+            'message' => $res['message'],
+            'error'   => $res['error'] ?? null,
+        ], 422);
     }
 
-    public function destroy(Customer $customer)
+    /**
+     * @param Customer $customer
+     *
+     * @return JsonResponse
+     */
+    public function destroy(Customer $customer): JsonResponse
     {
-        $customer->delete();
-        return redirect()->route('customers.index')->with('status','Удалено');
+        $res = $this->customerService->destroy($customer);
+
+        return response()->json([
+            'success' => $res['success'] ?? false,
+            'message' => $res['message'] ?? ($res['success'] ? 'Покупатель удален' : 'Ошибка при удалении'),
+        ]);
     }
 }
