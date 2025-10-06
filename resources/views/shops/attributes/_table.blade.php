@@ -23,4 +23,17 @@
     </table>
 </div>
 
-<div class="mt-4">{{ $items->links() }}</div>
+<div class="mt-4">
+    @if ($items->lastPage() > 1)
+        <nav class="flex gap-2">
+            @for ($i = 1; $i <= $items->lastPage(); $i++)
+                <a href="{{ request()->fullUrlWithQuery(['page' => $i]) }}"
+                   class="px-3 py-1 border rounded transition
+                          hover:bg-blue-100
+                          @if($i == $items->currentPage()) bg-blue-500 text-white font-semibold @else text-slate-600 @endif">
+                    {{ $i }}
+                </a>
+            @endfor
+        </nav>
+    @endif
+</div>

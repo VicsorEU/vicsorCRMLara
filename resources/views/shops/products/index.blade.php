@@ -21,43 +21,58 @@
             </div>
         </form>
 
-        <div id="productsTable" :class="{'opacity-50 pointer-events-none': loading}" x-html="tableHtml">
-            @include('shops.products._table', ['items' => $items])
-        </div>
+        <div id="productsTable" :class="{'opacity-50 pointer-events-none': loading}" x-html="tableHtml"></div>
     </x-ui.card>
 </div>
 
 <script>
     function productsSearch() {
         return {
-            searchTerm: '{{ $search }}',
+            searchTerm: '{{ $search ?? "" }}',
             section: '{{ $section }}',
-            tableHtml: `@include('shops.products._table', ['items' => $items])`,
+            tableHtml: `@include('shops.products._table', ['items'=>$items])`,
             loading: false,
 
-            async search() {
+            async loadPage(page = 1) {
                 this.loading = true;
                 try {
                     const params = new URLSearchParams({
                         search: this.searchTerm,
-                        section: this.section
+                        section: this.section,
+                        page: page
                     });
 
                     const response = await fetch('{{ route("shops.index_ajax") }}?' + params.toString(), {
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        headers: {'X-Requested-With': 'XMLHttpRequest'}
                     });
+
                     const data = await response.json();
 
                     if (data.success) {
                         this.tableHtml = data.html;
+
+                        this.$nextTick(() => {
+                            document.querySelectorAll('#productsTable a.page-link').forEach(link => {
+                                link.addEventListener('click', e => {
+                                    e.preventDefault();
+                                    const url = new URL(link.href);
+                                    const page = url.searchParams.get('page') || 1;
+                                    this.loadPage(page);
+                                });
+                            });
+                        });
                     } else {
-                        alert(data.message || 'Ошибка при поиске');
+                        alert(data.message || 'Ошибка при загрузке');
                     }
                 } catch (err) {
                     alert('Ошибка AJAX: ' + err);
                 } finally {
                     this.loading = false;
                 }
+            },
+
+            async search() {
+                await this.loadPage(1);
             }
         }
     }

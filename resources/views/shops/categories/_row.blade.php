@@ -16,8 +16,10 @@
     <td class="py-2 pr-4">
         @if($hasChildren)
             <button type="button"
-                    class="mr-2 rounded border px-1.5 text-xs align-middle"
-                    data-toggle="{{ $node->id }}" aria-expanded="false" title="Развернуть">
+                    class="toggle-btn mr-2 rounded border px-1.5 text-xs align-middle"
+                    data-toggle="{{ $node->id }}"
+                    aria-expanded="false"
+                    title="Развернуть">
                 <span>+</span>
             </button>
         @else
@@ -37,7 +39,9 @@
     <td class="py-2 pr-4">{{ optional($node->parent)->name ?: '—' }}</td>
     <td class="py-2 text-right">
         <a href="{{ route('shops.category.edit', ['section' => 'categories', 'category' => $node]) }}"
-           class="text-slate-500 hover:text-slate-800">Изм.</a>
+           class="edit-btn text-slate-500 hover:text-slate-800">
+            Изм.
+        </a>
     </td>
 </tr>
 

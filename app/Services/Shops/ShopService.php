@@ -114,7 +114,7 @@ class ShopService implements ShopInterface
                 $groups = $itemsCollection->groupBy(fn($w) => $w->parent_id ?? 0);
                 $roots  = $groups->get(0, collect());
 
-                return view('shops.warehouses._table', compact('roots', 'groups'))->render();
+                return view('shops.warehouses._table', compact('items', 'roots', 'groups'))->render();
 
             case 'products':
                 return view('shops.products._table', ['items' => $items])->render();
@@ -123,7 +123,7 @@ class ShopService implements ShopInterface
                 $groups = $itemsCollection->groupBy(fn($w) => $w->parent_id ?? 0);
                 $roots  = $groups->get(0, collect());
 
-                return view('shops.categories._table', compact('roots', 'groups'))->render();
+                return view('shops.categories._table', compact('items', 'roots', 'groups'))->render();
 
             case 'attributes':
                 return view('shops.attributes._table', ['items' => $items])->render();
@@ -132,8 +132,7 @@ class ShopService implements ShopInterface
                 return '<div class="text-red-500">Раздел не найден</div>';
         }
     }
-
-
+    
     /**
      * @param Request $request
      *
