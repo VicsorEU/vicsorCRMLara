@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\View;
 
 class ShopService implements ShopInterface
 {
@@ -64,18 +63,15 @@ class ShopService implements ShopInterface
             case 'warehouses':
                 $items = Warehouse::query()
                     ->withCount('children')
+                    ->when($search, fn($q, $s) => $q
+                        ->where('name', 'ILIKE', "%$s%")
+                        ->orWhere('code', 'ILIKE', "%$s%")
+                    )
                     ->orderBy('parent_id')
                     ->orderBy('sort_order')
                     ->orderBy('name')
                     ->paginate(15)
                     ->withQueryString();
-
-                if ($search !== '') {
-                    $searchLower = mb_strtolower($search);
-                    $items = $items->filter(fn($w) => str_contains(mb_strtolower($w->name), $searchLower) ||
-                        str_contains(mb_strtolower($w->code), $searchLower)
-                    );
-                }
                 break;
 
             case 'categories':
@@ -132,7 +128,7 @@ class ShopService implements ShopInterface
                 return '<div class="text-red-500">Раздел не найден</div>';
         }
     }
-    
+
     /**
      * @param Request $request
      *

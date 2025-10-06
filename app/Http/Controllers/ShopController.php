@@ -22,13 +22,7 @@ class ShopController extends Controller
      */
     public function index(Request $request): mixed
     {
-        $res = $this->shopService->index($request);
-
-        return view('shops.index', [
-            'section' => $res['section'],
-            'items' => $res['items'],
-            'search' => $res['search'],
-        ]);
+        return view('shops.index', $this->shopService->index($request));
     }
 
     /**
