@@ -14,7 +14,7 @@ class SettingsController extends Controller
     {
         // секция теперь приходит как query (?section=...)
         $section = $request->query('section', 'general');
-        if (!in_array($section, ['general','projects','users'], true)) {
+        if (!in_array($section, ['general','projects','users', 'widgets'], true)) {
             $section = 'general';
         }
 
@@ -53,6 +53,10 @@ class SettingsController extends Controller
             return view('settings.index', compact(
                 'section','projects','departments','types','priorities','randlables','grades'
             ));
+        }
+
+        if ($section === 'widgets') {
+            return view('settings.index', compact('section'));
         }
 
         // ====== Пользователи ======

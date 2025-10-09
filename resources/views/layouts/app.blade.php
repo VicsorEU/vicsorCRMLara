@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title','VicsorCRM')</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <style>[x-cloak]{display:none!important}</style>
+    <style>[x-cloak] {
+            display: none !important
+        }</style>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,8 +16,8 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { brand: { 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' } },
-                    boxShadow: { soft:'0 10px 30px rgba(2,6,23,.08)' }
+                    colors: {brand: {500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8'}},
+                    boxShadow: {soft: '0 10px 30px rgba(2,6,23,.08)'}
                 }
             }
         }
@@ -33,14 +35,26 @@
         </div>
         <nav class="p-2 space-y-1">
             <x-nav.link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">Дашборд</x-nav.link>
-            <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">Покупатели</x-nav.link>
+            <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">Покупатели
+            </x-nav.link>
             <x-nav.link href="{{ route('shops.index') }}" :active="request()->routeIs('shops.*')">Магазин</x-nav.link>
             @canAccess('projects', 'full', 'view')
-                <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
+            <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты
+            </x-nav.link>
+            <x-nav.link href="{{ route('communications.index') }}" :active="request()->routeIs('communications.*')" class="relative flex items-center gap-2">
+                <span>Коммуникации</span>
+                <template x-if="$store.newMessages.count > 0">
+                    <span
+                        class="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-semibold rounded-full px-1.5 py-0.5 leading-none shadow"
+                        x-text="$store.newMessages.count"
+                    ></span>
+                </template>
+            </x-nav.link>
             @endcanAccess
             <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
             @canAccess('settings','full')
-                <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки</x-nav.link>
+            <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки
+            </x-nav.link>
             @endcanAccess
         </nav>
         <form method="post" action="{{ route('logout') }}" class="p-2 mt-auto">
@@ -63,15 +77,27 @@
                 <button @click="openSidebar=false">✕</button>
             </div>
             <nav class="space-y-1">
-                <x-nav.link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">Дашборд</x-nav.link>
-                <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">Покупатели</x-nav.link>
-                <x-nav.link href="{{ route('categories.index') }}" :active="request()->routeIs('categories.*')">Категории</x-nav.link>
-                <x-nav.link href="{{ route('attributes.index') }}" :active="request()->routeIs('attributes.*')">Атрибуты</x-nav.link>
-                <x-nav.link href="{{ route('warehouses.index') }}" :active="request()->routeIs('warehouses.*')">Склады</x-nav.link>
-                <x-nav.link href="{{ route('products.index') }}" :active="request()->routeIs('products.*')">Товары</x-nav.link>
-                <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
-                <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
-                <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки</x-nav.link>
+                <x-nav.link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">Дашборд
+                </x-nav.link>
+                <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">
+                    Покупатели
+                </x-nav.link>
+                <x-nav.link href="{{ route('categories.index') }}" :active="request()->routeIs('categories.*')">
+                    Категории
+                </x-nav.link>
+                <x-nav.link href="{{ route('attributes.index') }}" :active="request()->routeIs('attributes.*')">
+                    Атрибуты
+                </x-nav.link>
+                <x-nav.link href="{{ route('warehouses.index') }}" :active="request()->routeIs('warehouses.*')">Склады
+                </x-nav.link>
+                <x-nav.link href="{{ route('products.index') }}" :active="request()->routeIs('products.*')">Товары
+                </x-nav.link>
+                <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты
+                </x-nav.link>
+                <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал
+                </x-nav.link>
+                <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки
+                </x-nav.link>
 
             </nav>
         </aside>
@@ -94,6 +120,86 @@
 @yield('scripts')
 @stack('scripts')
 @include('shared.global_timer')
+
+<div id="chat-notifications" class="fixed bottom-5 right-5 flex flex-col gap-2 z-50"></div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('newMessages', {
+            count: 0,
+            notifications: [],
+
+            init(chatId) {
+                const waitForEcho = setInterval(() => {
+                    if (window.Echo) {
+                        clearInterval(waitForEcho);
+                        this.subscribe(chatId);
+                    }
+                }, 100);
+            },
+
+            subscribe(chatId) {
+                window.Echo.private(`online-chat.${chatId}`)
+                    .listen('.new-message-online-chat', (e) => {
+                        console.log('Новое сообщение:', e);
+                        this.count++;
+
+                    });
+            },
+
+            addNotification(title, message, chatId) {
+
+                const container = document.getElementById('chat-notifications');
+                if (!container) return; // если контейнера нет, выходим
+
+                const id = Date.now();
+                this.notifications.push({ id, title, message, chatId });
+
+                // создаём элемент уведомления
+                const toast = document.createElement('div');
+                toast.id = `toast-${id}`;
+                toast.className = 'bg-blue-600 text-white p-4 rounded-lg shadow-lg cursor-pointer hover:bg-blue-700 transition-all duration-300 opacity-0 translate-y-5';
+                toast.innerHTML = `<strong>${title}</strong><br>${message}`;
+                container.appendChild(toast);
+
+                requestAnimationFrame(() => {
+                    toast.classList.remove('opacity-0', 'translate-y-5');
+                });
+
+                toast.addEventListener('click', () => {
+                    window.location.href = `/communications/${chatId}`;
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-5');
+                    toast.addEventListener('transitionend', () => {
+                        toast.remove();
+                        this.notifications = this.notifications.filter(n => n.id !== id);
+                    });
+                }, 10000);
+            },
+
+            async updateCount() {
+                try {
+                    const res = await fetch('{{ route('communications.unread_count_messages') }}');
+                    const data = await res.json();
+                    if (data.success) this.count = data.count;
+                } catch (e) {
+                    console.error('Ошибка получения количества сообщений', e);
+                }
+            }
+        });
+
+        // Запускаем обновление count каждые 30 секунд
+        const store = Alpine.store('newMessages');
+        store.updateCount();
+        setInterval(() => store.updateCount(), 30000);
+
+        // Инициализация Echo для конкретного чата (замени на актуальный chatId)
+        const chatId = {{ $chat->id ?? 0 }};
+        store.init(chatId);
+    });
+</script>
 
 </body>
 </html>

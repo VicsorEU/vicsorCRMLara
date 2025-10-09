@@ -8,6 +8,8 @@ use App\Services\Audits\AuditInterface;
 use App\Services\Audits\AuditService;
 use App\Services\Categories\CategoryInterface;
 use App\Services\Categories\CategoryService;
+use App\Services\Communications\CommunicationInterface;
+use App\Services\Communications\CommunicationService;
 use App\Services\Companies\CompanyInterface;
 use App\Services\Companies\CompanyService;
 use App\Services\Contacts\ContactInterface;
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AttributeInterface::class, AttributeService::class);
         $this->app->bind(AuditInterface::class, AuditService::class);
         $this->app->bind(CategoryInterface::class, CategoryService::class);
+        $this->app->bind(CommunicationInterface::class, CommunicationService::class);
         $this->app->bind(CompanyInterface::class, CompanyService::class);
         $this->app->bind(ContactInterface::class, ContactService::class);
         $this->app->bind(CustomerInterface::class, CustomerService::class);

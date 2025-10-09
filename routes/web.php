@@ -10,6 +10,7 @@ require __DIR__.'/web/auth.php';
 require __DIR__.'/web/core.php';
 require __DIR__.'/web/shops.php';
 require __DIR__.'/web/projects.php';
+require __DIR__.'/web/communication.php';
 require __DIR__.'/web/tasks.php';
 require __DIR__.'/web/timers.php';
 require __DIR__.'/web/files.php';
