@@ -421,7 +421,8 @@
                             const showUrl = '{{ route('settings.widgets.edit', ':id') }}'.replace(':id', data.chat_id);
                             window.location.href = showUrl;
                         } else {
-                            this.errors = data.errors || ['Ошибка при создании виджета'];
+                            this.errors = data.errors;
+                            return;
                         }
                     } catch (e) {
                         console.error(e);
