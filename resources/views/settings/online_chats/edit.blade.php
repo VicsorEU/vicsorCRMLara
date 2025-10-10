@@ -13,7 +13,7 @@
             </template>
         </div>
         <!-- Основные параметры -->
-        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section>
             <!-- Левая часть -->
             <div>
                 <!-- Название -->
@@ -69,10 +69,7 @@
                         </div>
                     </template>
                 </div>
-            </div>
 
-            <!-- Правая часть -->
-            <div>
                 <h2 class="font-semibold text-lg mb-2">Тексты виджета</h2>
 
                 <div class="space-y-3">
