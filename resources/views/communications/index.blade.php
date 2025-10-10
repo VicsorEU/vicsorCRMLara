@@ -4,7 +4,6 @@
 @section('page_title', 'Коммуникации')
 
 @php
-    // ➊ Берём вкладку из query (?section=...), валидируем
     $section = in_array(request('section'), ['general','telegram','emails'], true)
         ? request('section')
         : 'general';
@@ -36,19 +35,15 @@
             <div x-data="widgetSettings()" x-init="init()">
                 <div class="bg-white border rounded-2xl shadow-soft">
                     <div class="p-5">
-                        <div class="mt-4">
-                            <div id="communicationTable" x-html="tableHtml" @click="handleTableClick($event)"></div>
-                        </div>
+                        <div id="communicationTable" x-html="tableHtml"></div>
                     </div>
                 </div>
             </div>
         @endif
 
-        @if($section === 'telegram')
-        @endif
-
-        @if($section === 'emails')
-        @endif
+        @if($section === 'telegram') @endif
+        @if($section === 'emails') @endif
+    </div>
 
 
     <script type="text/javascript">
@@ -77,136 +72,65 @@
                 chatIds: [],
                 tableHtml: '',
                 token: document.querySelector('meta[name="csrf-token"]').content,
-                user_id: {{ Auth::id() }},
 
                 init() {
                     this.loadChats();
+                    // this.initUserChannel();
                 },
 
                 async loadChats() {
                     try {
-                        const response = await fetch("{{ route('communications.index_ajax') }}");
-                        const data = await response.json();
-
+                        const res = await fetch("{{ route('communications.index_ajax') }}");
+                        const data = await res.json();
                         this.chats = data.chats || [];
                         this.tableHtml = data.html || '';
                         this.chatIds = this.chats.map(c => c.id);
 
-                        // После загрузки таблицы, запускаем подписки Echo
                         this.$nextTick(() => {
-                            this.initEchoSubscriptions();
+                            const table = document.getElementById('communicationTable');
+                            if (table) table.addEventListener('click', e => this.handleTableClick(e));
                         });
                     } catch (err) {
-                        console.error('Ошибка при загрузке:', err);
+                        console.error('Ошибка при загрузке чатов:', err);
                     }
                 },
 
-                handleTableClick(event) {
-                    // Кнопка "Удалить"
-                    const btn = event.target.closest('.delete-chat');
-                    if (btn) {
-                        const chatId = btn.dataset.chatId;
-                        if (chatId) this.deleteChat(chatId);
-                        return;
-                    }
+                {{--initUserChannel() {--}}
+                {{--    const waitForEcho = setInterval(() => {--}}
+                {{--        if (window.Echo) {--}}
+                {{--            clearInterval(waitForEcho);--}}
 
-                    // Ссылка на чат
-                    const link = event.target.closest('.chat-link');
-                    if (link) {
-                        const chatId = link.dataset.chatId;
-                        if (chatId) this.markChatRead(chatId);
-                        return;
-                    }
-                },
+                {{--            // Подписка на канал пользователя--}}
+                {{--            window.Echo.private(`online-chat-user.{{ Auth::id() }}`)--}}
+                {{--                .listen('.new-message-online-chat', (event) => {--}}
+                {{--                    console.log('Новое сообщение:', event);--}}
+                {{--                    if (!event.chat_id) return;--}}
+                {{--                    this.updateUnreadCounter(event.chat_id);--}}
+                {{--                });--}}
+                {{--        }--}}
+                {{--    }, 100);--}}
+                {{--},--}}
 
-                async deleteChat(chatId) {
-                    if (!confirm('Удалить чат?')) return;
-
-                    try {
-                        const route = '{{ route('online-chat.destroy', ['onlineChat' => ':id']) }}'.replace(':id', chatId);
-                        const res = await fetch(route, {
-                            method: 'DELETE',
-                            headers: {
-                                'X-CSRF-TOKEN': this.token,
-                                'Accept': 'application/json'
-                            },
-                            credentials: 'same-origin'
-                        });
-
-                        if (res.ok) {
-                            const row = document.querySelector(`#chat-${chatId}`);
-                            if (row) row.remove();
-                            console.log(`Чат #${chatId} удалён`);
-                        } else {
-                            const errData = await res.json();
-                            console.error(`Ошибка при удалении чата #${chatId}`, errData);
-                        }
-                    } catch (err) {
-                        console.error('Ошибка запроса на удаление чата:', err);
-                    }
-                },
-
-                async markChatRead(chatId) {
-                    this.updateUnreadDisplay(chatId, 0);
-
-                    try {
-                        await fetch(`/online-chat/${chatId}/mark-read`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': this.token,
-                                'Content-Type': 'application/json'
-                            },
-                            credentials: 'same-origin'
-                        });
-                    } catch (err) {
-                        console.error('Ошибка при отметке прочитанным:', err);
-                    }
-                },
-
-                updateUnreadDisplay(chatId, count) {
+                updateUnreadCounter(chatId) {
                     const counter = document.querySelector(`#chat-${chatId} .unread-counter`);
-                    if (!counter) return;
-                    if (count > 0) {
-                        counter.textContent = count;
+                    if (counter) {
+                        let current = parseInt(counter.dataset.unread || '0', 10);
+                        current += 1;
+                        counter.dataset.unread = current;
+                        counter.textContent = current;
                         counter.style.display = 'inline-block';
-                        counter.dataset.unread = count;
                     } else {
-                        counter.style.display = 'none';
-                        counter.dataset.unread = 0;
+                        const chatRow = document.querySelector(`#chat-${chatId}`);
+                        if (chatRow) {
+                            const newCounter = document.createElement('span');
+                            newCounter.className = 'unread-counter ml-2 bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5';
+                            newCounter.dataset.unread = 1;
+                            newCounter.textContent = 1;
+                            const link = chatRow.querySelector('.chat-link');
+                            if (link) link.appendChild(newCounter);
+                        }
                     }
                 },
-
-                async fetchUnreadCount(chatId) {
-                    try {
-                        const url = `{{ route('online-chat.unread_count_messages', ['onlineChat' => ':id']) }}`.replace(':id', chatId);
-                        const res = await fetch(url, {
-                            headers: { 'Accept': 'application/json' },
-                            credentials: 'same-origin'
-                        });
-                        const data = await res.json();
-                        if (data.success) this.updateUnreadDisplay(chatId, data.count);
-                    } catch (err) {
-                        console.error('Ошибка при обновлении unread:', err);
-                    }
-                },
-
-                initEchoSubscriptions(attempt = 1) {
-                    if (!window.Echo) {
-                        if (attempt < 5) setTimeout(() => this.initEchoSubscriptions(attempt + 1), 1000);
-                        return;
-                    }
-
-                    this.chatIds.forEach(chatId => {
-                        const channel = window.Echo.private(`online-chat.${chatId}`);
-
-                        channel.listen('new-message-online-chat', event => {
-                            console.log(`Новое сообщение в чате #${chatId}`, event);
-                            this.fetchUnreadCount(chatId);
-                        });
-                    });
-
-                    console.log('Подписка Echo установлена на чаты:', this.chatIds);
-                }
             }));
         });
     </script>

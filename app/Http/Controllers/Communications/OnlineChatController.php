@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\Communications;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Settings\OnlineChats\StoreRequest;
+use App\Http\Requests\Settings\OnlineChats\UpdateRequest;
 use App\Models\OnlineChats\OnlineChat;
 use App\Models\OnlineChats\OnlineChatData;
 use App\Services\Communications\CommunicationInterface;
 use App\Services\Communications\OnlineChat\OnlineChatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class OnlineChatController extends Controller
 {
@@ -22,15 +23,21 @@ class OnlineChatController extends Controller
         $this->onlineChatService = $onlineChatService;
     }
 
+    public function store(StoreRequest $request)
+    {
+        $data = $request->validated();
+        return response()->json($this->communicationService->store($data));
+    }
+
     public function edit(OnlineChat $onlineChat)
     {
         $onlineChat->work_days_array = $onlineChat->work_days ? explode(',', $onlineChat->work_days) : [];
-        return view('communications.edit', compact('onlineChat'));
+        return view('settings.online_chats.edit', compact('onlineChat'));
     }
 
-    public function update(Request $request, OnlineChat $onlineChat)
+    public function update(UpdateRequest $request, OnlineChat $onlineChat)
     {
-        $data = $request->all();
+        $data = $request->validated();
 
         $onlineChat = $this->onlineChatService->updateCompanyChat($onlineChat, $data);
 
@@ -63,19 +70,15 @@ class OnlineChatController extends Controller
 
     public function sendMessage(Request $request)
     {
-        $this->communicationService->sendMessage($request);
-        return view('communications.index');
+        return response()->json([$this->communicationService->sendMessage($request)]);
     }
 
     public function unreadCountMessages(OnlineChat $onlineChat)
     {
         $unreadCountMessages = OnlineChatData::query()
             ->where('online_chat_id', $onlineChat->id)
-            ->where('type', OnlineChatData::TYPE_INCOMING)
+            ->where('type',OnlineChatData::TYPE_INCOMING)
             ->where('status', OnlineChatData::STATUS_SENT)
-            ->with(['onlineChat' => function ($query) {
-                $query->where('user_id', Auth::id());
-            }])
             ->count();
 
         return response()->json([

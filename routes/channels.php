@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Broadcast;
 |--------------------------------------------------------------------------
 |
 */
-
-Broadcast::channel('online-chat.{chatId}', OnlineChatChannel::class);
+Broadcast::channel('online-chat-tab.{token}', OnlineChatChannel::class);
 
 

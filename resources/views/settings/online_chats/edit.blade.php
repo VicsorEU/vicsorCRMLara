@@ -7,16 +7,24 @@
     <div x-data="onlineChatEditor(@js($onlineChat))" x-init="init()" class="bg-white border rounded-2xl shadow-soft p-6">
         <h1 class="text-2xl font-semibold mb-4">Редактирование виджета</h1>
 
+        <div x-show="errors.general" class="mb-4 text-red-600">
+            <template x-for="err in errors.general" :key="err">
+                <p x-text="err"></p>
+            </template>
+        </div>
         <!-- Основные параметры -->
         <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Левая часть -->
             <div>
+                <!-- Название -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Название виджета</label>
                     <input type="text" x-model="form.name"
                            class="w-full border rounded-lg px-3 py-2 focus:ring focus:ring-brand-500">
+                    <p x-show="errors.name" x-text="errors.name" class="text-red-600 text-sm mt-1"></p>
                 </div>
 
+                <!-- Рабочие дни -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Рабочие дни</label>
                     <div class="flex flex-wrap gap-2">
@@ -28,20 +36,27 @@
                             </label>
                         </template>
                     </div>
+                    <p x-show="errors.work_days" x-text="errors.work_days" class="text-red-600 text-sm mt-1"></p>
                 </div>
 
+                <!-- Рабочее время -->
                 <div class="mb-4 flex gap-3 items-center">
                     <label class="text-sm font-medium text-slate-700">Рабочее время:</label>
                     <input type="time" x-model="form.work_from" class="border rounded px-2 py-1">
                     <span>—</span>
                     <input type="time" x-model="form.work_to" class="border rounded px-2 py-1">
                 </div>
+                <p x-show="errors.work_from" x-text="errors.work_from" class="text-red-600 text-sm mt-1"></p>
+                <p x-show="errors.work_to" x-text="errors.work_to" class="text-red-600 text-sm mt-1"></p>
 
+                <!-- Цвет -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Цветовая гамма</label>
                     <input type="color" x-model="form.widget_color" class="w-16 h-8 border rounded">
+                    <p x-show="errors.widget_color" x-text="errors.widget_color" class="text-red-600 text-sm mt-1"></p>
                 </div>
 
+                <!-- Соцсети -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Каналы и соцсети</label>
                     <template x-for="(link, key) in messengers" :key="key">
@@ -49,6 +64,8 @@
                             <label class="block text-xs text-gray-600 mb-1" x-text="key"></label>
                             <input type="text" x-model="form[key.toLowerCase()]"
                                    class="w-full border rounded-lg px-3 py-2 focus:ring focus:ring-brand-500">
+                            <p x-show="errors[key.toLowerCase()]" x-text="errors[key.toLowerCase()]"
+                               class="text-red-600 text-sm mt-1"></p>
                         </div>
                     </template>
                 </div>
@@ -59,36 +76,28 @@
                 <h2 class="font-semibold text-lg mb-2">Тексты виджета</h2>
 
                 <div class="space-y-3">
-                    <div>
-                        <label class="block text-sm text-slate-700 mb-1">Заголовок</label>
-                        <input type="text" x-model="form.title" class="w-full border rounded px-3 py-2">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm text-slate-700 mb-1">Мы онлайн</label>
-                        <input type="text" x-model="form.online_text" class="w-full border rounded px-3 py-2">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm text-slate-700 mb-1">Мы оффлайн</label>
-                        <input type="text" x-model="form.offline_text" class="w-full border rounded px-3 py-2">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm text-slate-700 mb-1">Поле ввода сообщения</label>
-                        <input type="text" x-model="form.placeholder" class="w-full border rounded px-3 py-2">
-                    </div>
+                    <template x-for="field in ['title','online_text','offline_text','placeholder']" :key="field">
+                        <div>
+                            <label class="block text-sm text-slate-700 mb-1" x-text="labels[field]"></label>
+                            <input type="text" x-model="form[field]" class="w-full border rounded px-3 py-2">
+                            <p x-show="errors[field]" x-text="errors[field]" class="text-red-600 text-sm mt-1"></p>
+                        </div>
+                    </template>
 
                     <div>
                         <label class="block text-sm text-slate-700 mb-1">Приветствие (нерабочее время)</label>
                         <textarea x-model="form.greeting_offline" rows="2"
                                   class="w-full border rounded px-3 py-2"></textarea>
+                        <p x-show="errors.greeting_offline" x-text="errors.greeting_offline"
+                           class="text-red-600 text-sm mt-1"></p>
                     </div>
 
                     <div>
                         <label class="block text-sm text-slate-700 mb-1">Приветствие (рабочее время)</label>
                         <textarea x-model="form.greeting_online" rows="2"
                                   class="w-full border rounded px-3 py-2"></textarea>
+                        <p x-show="errors.greeting_online" x-text="errors.greeting_online"
+                           class="text-red-600 text-sm mt-1"></p>
                     </div>
 
                     <div>
@@ -117,7 +126,25 @@
             document.addEventListener('alpine:init', () => {
                 Alpine.data('onlineChatEditor', (onlineChat) => ({
                     saving: false,
-                    days: { mon:'Пн', tue:'Вт', wed:'Ср', thu:'Чт', fri:'Пт', sat:'Сб', sun:'Нд' },
+                    errors: {},
+
+                    labels: {
+                        title: 'Заголовок',
+                        online_text: 'Мы онлайн',
+                        offline_text: 'Мы оффлайн',
+                        placeholder: 'Поле ввода сообщения'
+                    },
+
+                    days: {
+                        mon: 'Пн',
+                        tue: 'Вт',
+                        wed: 'Ср',
+                        thu: 'Чт',
+                        fri: 'Пт',
+                        sat: 'Сб',
+                        sun: 'Нд'
+                    },
+
                     messengers: {
                         Telegram: 'https://t.me/',
                         Instagram: 'https://ig.me/',
@@ -127,6 +154,8 @@
                     },
 
                     form: {
+                        user_id: '{{ Auth::id() }}',
+                        type: 'onlineChat',
                         name: onlineChat.name ?? '',
                         token: onlineChat.token ?? '',
                         work_days: @json($onlineChat->work_days_array) ?? [],
@@ -144,57 +173,69 @@
                         placeholder: onlineChat.placeholder ?? '',
                         greeting_offline: onlineChat.greeting_offline ?? '',
                         greeting_online: onlineChat.greeting_online ?? '',
-                        custom_script: `
-<script type="text/javascript">
-    (function(w,d,t,u,c){
-        var s=d.createElement(t),
-        j=d.getElementsByTagName(t)[0];
-        s.src = u;
-        s.async = true;
-        s.defer = true;
-        s.onload = function() {
-        if(typeof VicsorCRMChat !== "undefined"){
-            VicsorCRMChat.init(c);
-        } else {
-            console.error("VicsorCRMChat script failed to load.");
-        }
-    };
-    j.parentNode.insertBefore(s,j);
-})(window, document, "script", "${scriptUrl}", {
-    token: "{{ $onlineChat->token }}"
-});<\/script>`
-                    },
+                        custom_script: `<script type="text/javascript">
+                        (function(w,d,t,u,c){
+                        var s=d.createElement(t),
+                        j=d.getElementsByTagName(t)[0];
+                        s.src = u;
+                        s.async = true;
+                        s.defer = true;
+                        s.onload = function() {
+                        if(typeof VicsorCRMChat !== "undefined"){
+                        VicsorCRMChat.init(c);
+                    } else {
+                        console.error("VicsorCRMChat script failed to load.");
+                    }
+                    };
+                        j.parentNode.insertBefore(s,j);
+                    })(window, document, "script", "${scriptUrl}", {
+                        token: "{{ $onlineChat->token }}"
+                    });<\/script>`
+                },
 
                     async save() {
-                        this.saving = true;
-                        try {
-                            const res = await fetch('{{ route('online-chat.update', $onlineChat->id) }}', {
-                                method: 'PUT',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-                                },
-                                body: JSON.stringify(this.form)
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                                alert('Настройки успешно сохранены');
-                                window.location.href = '{{ route('communications.index') }}';
-                            } else {
-                                alert('Ошибка при сохранении');
-                            }
-                        } catch (e) {
-                            console.error(e);
-                            alert('Ошибка соединения');
-                        } finally {
-                            this.saving = false;
-                        }
-                    },
+                    this.saving = true;
+                    this.errors = {};
 
-                    resetForm() {
-                        window.location.href = '{{ route('communications.index') }}';
+                    try {
+                        const res = await fetch('{{ route('settings.widgets.update', $onlineChat->id) }}', {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                            },
+                            body: JSON.stringify(this.form)
+                        });
+
+                        const data = await res.json();
+
+                        if (data.errors) {
+                            // выводим ошибки в поля
+                            this.errors = data.errors;
+                            return;
+                        }
+
+                        if (data.success) {
+                            // успешное сохранение
+                            window.location.href = '{{ route('settings.index', ['section' => 'widgets']) }}';
+                        } else {
+                            // общая ошибка сервера
+                            this.errors.general = ['Ошибка при сохранении данных'];
+                        }
+
+                    } catch (e) {
+                        console.error(e);
+                        this.errors.general = ['Ошибка соединения с сервером'];
+                    } finally {
+                        this.saving = false;
                     }
-                }));
+                },
+
+                resetForm() {
+                    window.location.href = '{{ route('settings.index', ['section' => 'widgets']) }}';
+                }
+            }));
             });
         </script>
     @endpush

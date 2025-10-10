@@ -105,7 +105,8 @@ class CommunicationService implements CommunicationInterface
                             ->orWhere('title','ILIKE',"%$s%"));
                     })
                     ->withCount(['onlineChatData as unread_messages_count' => function ($q) {
-                        $q->where('status', OnlineChatData::STATUS_SENT);
+                        $q->where('status', OnlineChatData::STATUS_SENT)
+                        ->where('type', OnlineChatData::TYPE_INCOMING);
                     }])
                     ->orderByDesc('created_at')
                     ->paginate(15)

@@ -44,6 +44,8 @@ class OnlineChatController extends Controller
                 'placeholder' => $widget->placeholder,
                 'greeting_offline' => $widget->greeting_offline,
                 'greeting_online' => $widget->greeting_online,
+                'pusher_key' => env('PUSHER_APP_KEY'),
+                'pusher_cluster' => env('PUSHER_APP_SECRET'),
             ]
         ]);
     }
@@ -57,6 +59,10 @@ class OnlineChatController extends Controller
     public function getMessages(string $token)
     {
         $onlineChat = OnlineChat::where('token', $token)->first();
+
+        if (!$onlineChat) {
+            return response()->json(['success' => false, 'message' => 'Chat not found']);
+        }
 
         $onlineChatData = OnlineChatData::query()
             ->where('online_chat_id', $onlineChat->id)

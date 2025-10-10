@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\OnlineChats\OnlineChat;
+use App\Models\OnlineChats\OnlineChatData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -56,7 +58,17 @@ class SettingsController extends Controller
         }
 
         if ($section === 'widgets') {
-            return view('settings.index', compact('section'));
+            $chats = OnlineChat::query()
+                ->orderByDesc('created_at')
+                ->paginate(15)
+                ->withQueryString();
+
+            $chats->getCollection()->transform(function ($chat) {
+                $chat->type_chat = 'online сhat';
+                return $chat;
+            });
+
+            return view('settings.index', compact('section', 'chats'));
         }
 
         // ====== Пользователи ======

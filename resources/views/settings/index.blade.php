@@ -187,7 +187,7 @@
 
         @if($section === 'widgets')
             <div x-data="widgetSettings()" x-init="init()" class="bg-white rounded-2xl shadow-xl p-6">
-                @include('settings.create_chat_widgets')
+                @include('settings.online_chats.create_chat_widgets')
             </div>
         @endif
 
@@ -369,7 +369,7 @@
                 placeholder: 'Опишите задачу...',
                 greeting_offline: 'Спасибо за обращение!',
                 greeting_online: 'Здравствуйте! Расскажите о своем бизнесе...',
-                days: { mon:'Пн', tue:'Вт', wed:'Ср', thu:'Чт', fri:'Пт', sat:'Сб', sun:'Нд' },
+                days: {mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб', sun: 'Нд'},
 
                 messengers: {
                     Telegram: 'https://t.me/',
@@ -405,19 +405,20 @@
                     };
 
                     try {
-                        const route = '{{ route('communications.store') }}'
+                        const route = '{{ route('settings.widgets.store') }}'
 
                         const res = await fetch(route, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
+                                'Accept': 'application/json',
                                 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
                             },
                             body: JSON.stringify(payload)
                         });
                         const data = await res.json();
                         if (data.success) {
-                            const showUrl = '{{ route('online-chat.edit', ':id') }}'.replace(':id', data.chat_id);
+                            const showUrl = '{{ route('settings.widgets.edit', ':id') }}'.replace(':id', data.chat_id);
                             window.location.href = showUrl;
                         } else {
                             this.errors = data.errors || ['Ошибка при создании виджета'];
@@ -453,6 +454,5 @@
                 }
             }
         }
-
     </script>
 @endsection

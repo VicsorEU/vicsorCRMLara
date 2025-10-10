@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Communications\OnlineChatController;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\SettingsController;
@@ -64,4 +65,9 @@ Route::middleware('auth')->group(function () {
         ->whereNumber('role')->middleware('access:settings,full')->name('settings.users.roles.update');
     Route::delete('/settings/roles/{role}',        [RolesCtrl::class,'destroy'])
         ->whereNumber('role')->middleware('access:settings,full')->name('settings.users.roles.destroy');
+
+    Route::get('/settings/widgets/{onlineChat}/edit', [OnlineChatController::class,'edit'])->name('settings.widgets.edit');
+    Route::post('/settings/widgets/store', [OnlineChatController::class,'store'])->name('settings.widgets.store');
+    Route::put('/settings/widgets/{onlineChat}/update', [OnlineChatController::class,'update'])->name('settings.widgets.update');
+    Route::delete('/settings/widgets/{onlineChat}/destroy', [OnlineChatController::class,'destroy'])->name('settings.widgets.destroy');
 });

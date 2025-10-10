@@ -18,11 +18,11 @@ class OnlineChatChannel
     /**
      * Authenticate the user's access to the channel.
      */
-    public function join(User $user, $chatId)
+    public function join($token)
     {
-        $chat = OnlineChat::find($chatId);
+        $chat = OnlineChat::where('token', $token)->first();
         if (!$chat) return false;
 
-        return ['id' => $user->id];
+        return ['token' => $token];
     }
 }

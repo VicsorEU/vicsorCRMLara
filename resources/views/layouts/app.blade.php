@@ -129,33 +129,67 @@
             count: 0,
             notifications: [],
 
-            init(chatId) {
+            init() {
+                // Ждём, пока Echo загрузится
                 const waitForEcho = setInterval(() => {
                     if (window.Echo) {
                         clearInterval(waitForEcho);
-                        this.subscribe(chatId);
+                        this.subscribeUserChannel();
                     }
                 }, 100);
+
+                // Первичное обновление количества непрочитанных
+                this.updateCount();
+                setInterval(() => this.updateCount(), 30000); // каждые 30 секунд
             },
 
-            subscribe(chatId) {
-                window.Echo.private(`online-chat.${chatId}`)
-                    .listen('.new-message-online-chat', (e) => {
-                        console.log('Новое сообщение:', e);
-                        this.count++;
+            subscribeUserChannel() {
+                if (!window.Echo) {
+                    setTimeout(() => this.subscribeUserChannel(), 200);
+                    return;
+                }
 
+                // Подписка на канал пользователя, чтобы ловить все сообщения
+                window.Echo.private(`online-chat-user.{{ Auth::id() }}`)
+                    .listen('.new-message-online-chat', (event) => {
+                        console.log('Новое сообщение:', event);
+
+                        // event должен содержать chat_id, name и preview
+                        this.incrementChatCounter(event.chat_id);
+                        this.addNotification(event.name, event.preview, event.chat_id);
                     });
             },
 
-            addNotification(title, message, chatId) {
+            incrementChatCounter(chatId) {
+                const counter = document.querySelector(`#chat-${chatId} .unread-counter`);
+                if (counter) {
+                    let current = parseInt(counter.dataset.unread || '0', 10);
+                    current += 1;
+                    counter.dataset.unread = current;
+                    counter.textContent = current;
+                    counter.style.display = 'inline-block';
+                } else {
+                    const chatRow = document.querySelector(`#chat-${chatId}`);
+                    if (chatRow) {
+                        const newCounter = document.createElement('span');
+                        newCounter.className = 'unread-counter ml-2 bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5';
+                        newCounter.dataset.unread = 1;
+                        newCounter.textContent = 1;
+                        chatRow.querySelector('.chat-link').appendChild(newCounter);
+                    }
+                }
 
+                // глобальный счётчик всех сообщений
+                this.count++;
+            },
+
+            addNotification(title, message, chatId) {
                 const container = document.getElementById('chat-notifications');
-                if (!container) return; // если контейнера нет, выходим
+                if (!container) return;
 
                 const id = Date.now();
                 this.notifications.push({ id, title, message, chatId });
 
-                // создаём элемент уведомления
                 const toast = document.createElement('div');
                 toast.id = `toast-${id}`;
                 toast.className = 'bg-blue-600 text-white p-4 rounded-lg shadow-lg cursor-pointer hover:bg-blue-700 transition-all duration-300 opacity-0 translate-y-5';
@@ -190,14 +224,8 @@
             }
         });
 
-        // Запускаем обновление count каждые 30 секунд
-        const store = Alpine.store('newMessages');
-        store.updateCount();
-        setInterval(() => store.updateCount(), 30000);
-
-        // Инициализация Echo для конкретного чата (замени на актуальный chatId)
-        const chatId = {{ $chat->id ?? 0 }};
-        store.init(chatId);
+        // Автоинициализация
+        Alpine.store('newMessages').init();
     });
 </script>
 

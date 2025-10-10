@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Communications;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Communications\StoreRequest;
+use App\Http\Requests\Settings\OnlineChats\StoreRequest;
 use App\Models\OnlineChats\OnlineChat;
 use App\Models\OnlineChats\OnlineChatData;
-use App\Models\OnlineChats\OnlineChatSession;
-use App\Models\User;
 use App\Services\Communications\CommunicationInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,21 +35,13 @@ class CommunicationController extends Controller
         return view('communications.show', compact('chat'));
     }
 
-    public function store(StoreRequest $request)
-    {
-        $data = $request->validated();
-        return response()->json($this->communicationService->store($data));
-    }
-
     public function unreadCountMessages()
     {
         $unreadCountMessages = OnlineChatData::query()
-            ->where('type', OnlineChatData::TYPE_INCOMING)
+            ->where('type',OnlineChatData::TYPE_INCOMING)
             ->where('status', OnlineChatData::STATUS_SENT)
-            ->with(['onlineChatSession' => function ($query) {
-                $query->with(['onlineChat' => function ($q) {
-                    $q->where('user_id', Auth::id());
-                }]);
+            ->with(['onlineChat' => function ($query) {
+                $query->where('user_id', Auth::id());
             }])
             ->count();
 

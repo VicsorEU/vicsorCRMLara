@@ -4,7 +4,6 @@ namespace App\Events;
 
 use App\Models\OnlineChats\OnlineChat;
 use App\Models\OnlineChats\OnlineChatData;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -24,9 +23,13 @@ class NewMessageOnlineChat implements ShouldBroadcast
         $this->onlineChat = $onlineChat;
     }
 
-    public function broadcastOn(): Channel
+    public function broadcastOn(): array
     {
-        return new PrivateChannel('online-chat.' . $this->onlineChat->id);
+        return [
+            new PrivateChannel('online-chat.' . $this->onlineChat->id),
+            new PrivateChannel('online-chat-user.' . $this->onlineChat->user_id),
+            new PrivateChannel('online-chat-tab.' . $this->onlineChat->token),
+        ];
     }
 
     public function broadcastAs(): string
@@ -37,9 +40,12 @@ class NewMessageOnlineChat implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
+            'chat_id' => $this->onlineChat->id,
             'name' => $this->onlineChat->name,
             'preview' => mb_strimwidth($this->onlineChatData->message ?? '', 0, 50, '...'),
             'token' => $this->onlineChat->token,
+            'message' => $this->onlineChatData->message,
+            'type' => $this->onlineChatData->type,
         ];
     }
 }

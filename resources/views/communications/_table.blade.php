@@ -5,7 +5,6 @@
             <th class="p-3 border-b">Название</th>
             <th class="p-3 border-b">Рабочие дни</th>
             <th class="p-3 border-b">Рабочее время</th>
-            <th class="p-3 border-b text-center w-44">Действия</th>
         </tr>
         </thead>
         <tbody>
@@ -33,19 +32,6 @@
                 </td>
 
                 <td class="p-3">{{ $chat->work_from }} — {{ $chat->work_to }}</td>
-
-                <td class="p-3 text-center">
-                    <div class="flex items-center justify-center gap-2">
-                        <a href="{{ route('online-chat.edit', $chat->id) }}"
-                           class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">
-                            Редактировать
-                        </a>
-                        <button class="delete-chat flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
-                                data-chat-id="{{ $chat->id }}">
-                            Удалить
-                        </button>
-                    </div>
-                </td>
             </tr>
         @empty
             <tr>
