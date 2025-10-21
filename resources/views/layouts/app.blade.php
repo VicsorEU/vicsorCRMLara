@@ -5,25 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title','VicsorCRM')</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <style>[x-cloak] {
-            display: none !important
-        }</style>
+
+    <style>[x-cloak]{display:none!important}</style>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {brand: {500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8'}},
-                    boxShadow: {soft: '0 10px 30px rgba(2,6,23,.08)'}
+                    colors: { brand: {500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8'} },
+                    boxShadow: { soft: '0 10px 30px rgba(2,6,23,.08)' }
                 }
             }
         }
     </script>
+
+    @vite(['resources/js/app.js'])
+
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
     @yield('head')
 </head>
+
 <body class="min-h-dvh bg-slate-50 text-slate-900">
 <div class="flex min-h-dvh">
 
@@ -35,26 +39,23 @@
         </div>
         <nav class="p-2 space-y-1">
             <x-nav.link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">Дашборд</x-nav.link>
-            <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">Покупатели
-            </x-nav.link>
+            <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">Покупатели</x-nav.link>
             <x-nav.link href="{{ route('shops.index') }}" :active="request()->routeIs('shops.*')">Магазин</x-nav.link>
             @canAccess('projects', 'full', 'view')
-            <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты
-            </x-nav.link>
+            <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
             <x-nav.link href="{{ route('communications.index') }}" :active="request()->routeIs('communications.*')" class="relative flex items-center gap-2">
                 <span>Коммуникации</span>
                 <template x-if="$store.newMessages.count > 0">
-                    <span
-                        class="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-semibold rounded-full px-1.5 py-0.5 leading-none shadow"
-                        x-text="$store.newMessages.count"
-                    ></span>
+        <span
+            x-text="$store.newMessages.count"
+            class="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-semibold rounded-full px-1.5 py-0.5 leading-none shadow"
+        ></span>
                 </template>
             </x-nav.link>
             @endcanAccess
             <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
             @canAccess('settings','full')
-            <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки
-            </x-nav.link>
+            <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки</x-nav.link>
             @endcanAccess
         </nav>
         <form method="post" action="{{ route('logout') }}" class="p-2 mt-auto">
@@ -62,46 +63,6 @@
             <button class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100">Выйти</button>
         </form>
     </aside>
-
-    {{-- Mobile sidebar button --}}
-    <div class="md:hidden fixed top-3 left-3 z-50">
-        <button @click="openSidebar=true" class="p-2 rounded-lg bg-white shadow-soft border">☰</button>
-    </div>
-
-    {{-- Mobile drawer --}}
-    <div x-show="openSidebar" x-cloak class="fixed inset-0 z-40 md:hidden">
-        <div class="absolute inset-0 bg-black/40" @click="openSidebar=false"></div>
-        <aside class="absolute left-0 top-0 bottom-0 w-72 bg-white p-4">
-            <div class="mb-4 flex items-center justify-between">
-                <div class="font-semibold">VicsorCRM</div>
-                <button @click="openSidebar=false">✕</button>
-            </div>
-            <nav class="space-y-1">
-                <x-nav.link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')">Дашборд
-                </x-nav.link>
-                <x-nav.link href="{{ route('customers.index') }}" :active="request()->routeIs('customers.*')">
-                    Покупатели
-                </x-nav.link>
-                <x-nav.link href="{{ route('categories.index') }}" :active="request()->routeIs('categories.*')">
-                    Категории
-                </x-nav.link>
-                <x-nav.link href="{{ route('attributes.index') }}" :active="request()->routeIs('attributes.*')">
-                    Атрибуты
-                </x-nav.link>
-                <x-nav.link href="{{ route('warehouses.index') }}" :active="request()->routeIs('warehouses.*')">Склады
-                </x-nav.link>
-                <x-nav.link href="{{ route('products.index') }}" :active="request()->routeIs('products.*')">Товары
-                </x-nav.link>
-                <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты
-                </x-nav.link>
-                <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал
-                </x-nav.link>
-                <x-nav.link href="{{ route('settings.index') }}" :active="request()->routeIs('settings.*')">Настройки
-                </x-nav.link>
-
-            </nav>
-        </aside>
-    </div>
 
     {{-- Main --}}
     <main class="flex-1">
@@ -121,111 +82,112 @@
 @stack('scripts')
 @include('shared.global_timer')
 
+<script src="{{ asset('js/chat.js') }}" defer></script>
+
 <div id="chat-notifications" class="fixed bottom-5 right-5 flex flex-col gap-2 z-50"></div>
 
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.store('newMessages', {
             count: 0,
+            chatCounters: {},
             notifications: [],
 
-            init() {
-                // Ждём, пока Echo загрузится
-                const waitForEcho = setInterval(() => {
-                    if (window.Echo) {
-                        clearInterval(waitForEcho);
-                        this.subscribeUserChannel();
-                    }
-                }, 100);
-
-                // Первичное обновление количества непрочитанных
-                this.updateCount();
-                setInterval(() => this.updateCount(), 30000); // каждые 30 секунд
+            incrementChatCounter(chatId, count) {
+                // console.log(`[NewMessages] Обновляем счетчик чата ${chatId} -> ${count}`);
+                const counterEl = document.querySelector(`#chat-${chatId} .unread-counter`);
+                this.chatCounters[chatId] = count;
+                if (counterEl) {
+                    counterEl.dataset.unread = count;
+                    counterEl.textContent = count;
+                    counterEl.style.display = count > 0 ? 'inline-block' : 'none';
+                }
             },
 
-            subscribeUserChannel() {
-                if (!window.Echo) {
-                    setTimeout(() => this.subscribeUserChannel(), 200);
-                    return;
-                }
-
-                // Подписка на канал пользователя, чтобы ловить все сообщения
-                window.Echo.private(`online-chat-user.{{ Auth::id() }}`)
-                    .listen('.new-message-online-chat', (event) => {
-                        console.log('Новое сообщение:', event);
-
-                        // event должен содержать chat_id, name и preview
-                        this.incrementChatCounter(event.chat_id);
-                        this.addNotification(event.name, event.preview, event.chat_id);
-                    });
-            },
-
-            incrementChatCounter(chatId) {
-                const counter = document.querySelector(`#chat-${chatId} .unread-counter`);
-                if (counter) {
-                    let current = parseInt(counter.dataset.unread || '0', 10);
-                    current += 1;
-                    counter.dataset.unread = current;
-                    counter.textContent = current;
-                    counter.style.display = 'inline-block';
-                } else {
-                    const chatRow = document.querySelector(`#chat-${chatId}`);
-                    if (chatRow) {
-                        const newCounter = document.createElement('span');
-                        newCounter.className = 'unread-counter ml-2 bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5';
-                        newCounter.dataset.unread = 1;
-                        newCounter.textContent = 1;
-                        chatRow.querySelector('.chat-link').appendChild(newCounter);
-                    }
-                }
-
-                // глобальный счётчик всех сообщений
-                this.count++;
+            resetAllCounters() {
+                // console.log('[NewMessages] Сбрасываем все счетчики');
+                Object.keys(this.chatCounters).forEach(chatId => {
+                    this.incrementChatCounter(chatId, 0);
+                });
+                this.count = 0;
             },
 
             addNotification(title, message, chatId) {
                 const container = document.getElementById('chat-notifications');
                 if (!container) return;
 
-                const id = Date.now();
-                this.notifications.push({ id, title, message, chatId });
-
+                const id = Date.now() + Math.random();
+                // console.log(`[NewMessages] Добавляем уведомление: ${title} - ${message}`);
                 const toast = document.createElement('div');
                 toast.id = `toast-${id}`;
-                toast.className = 'bg-blue-600 text-white p-4 rounded-lg shadow-lg cursor-pointer hover:bg-blue-700 transition-all duration-300 opacity-0 translate-y-5';
+                toast.className = 'bg-blue-600 text-white p-4 rounded-lg shadow-lg cursor-pointer opacity-0 translate-y-5';
                 toast.innerHTML = `<strong>${title}</strong><br>${message}`;
-                container.appendChild(toast);
-
-                requestAnimationFrame(() => {
-                    toast.classList.remove('opacity-0', 'translate-y-5');
-                });
 
                 toast.addEventListener('click', () => {
-                    window.location.href = `/communications/${chatId}`;
+                    if (chatId) window.location.href = `/communications/${chatId}`;
                 });
 
+                container.appendChild(toast);
+                requestAnimationFrame(() => toast.classList.remove('opacity-0', 'translate-y-5'));
+
                 setTimeout(() => {
-                    toast.classList.add('opacity-0', 'translate-y-5');
-                    toast.addEventListener('transitionend', () => {
-                        toast.remove();
-                        this.notifications = this.notifications.filter(n => n.id !== id);
-                    });
-                }, 10000);
+                    toast.remove();
+                    this.notifications = this.notifications.filter(n => n.id !== id);
+                }, 15000);
             },
 
-            async updateCount() {
-                try {
-                    const res = await fetch('{{ route('communications.unread_count_messages') }}');
-                    const data = await res.json();
-                    if (data.success) this.count = data.count;
-                } catch (e) {
-                    console.error('Ошибка получения количества сообщений', e);
+            async updateFromServer() {
+                // console.log('[NewMessages] Запрашиваем новые сообщения с сервера...');
+                if (!window.chatComponent || typeof window.chatComponent.fetchNewMessages !== 'function') {
+                    console.error('chatComponent.fetchNewMessages не найден!');
+                    return;
                 }
-            }
+
+                const data = await window.chatComponent.fetchNewMessages();
+                if (Array.isArray(data)) return;
+
+                console.log('[NewMessages] Получены данные:', data);
+
+                // Если нет групп, сбрасываем все счетчики
+                if (!data.grouped || Object.keys(data.grouped).length === 0) {
+                    this.resetAllCounters();
+                    return;
+                }
+
+                // Обновляем общий счетчик
+                this.count = data.count ?? 0;
+
+                // Обновляем счетчики по чатам
+                Object.values(data.grouped).forEach(group => {
+                    const chatId = group.online_chat_id ?? null;
+                    const count = group.count ?? 0;
+                    if (chatId !== null) this.incrementChatCounter(chatId, count);
+                });
+
+                // Добавляем уведомления для новых сообщений
+                Object.values(data.messages).forEach(msg => {
+                    const chatId = msg.online_chat_id ?? null;
+                    const title = msg.user_name ?? 'Новое сообщение';
+                    const text = msg.message ?? '';
+                    if (chatId && text) this.addNotification(title, text, chatId);
+                });
+            },
         });
 
-        // Автоинициализация
-        Alpine.store('newMessages').init();
+        function waitForChatComponent(callback) {
+            if (window.chatComponent && typeof window.chatComponent.fetchNewMessages === 'function') {
+                callback();
+            } else {
+                setTimeout(() => waitForChatComponent(callback), 50);
+            }
+        }
+
+        waitForChatComponent(() => {
+            window.chatComponent.init({ userId: {{ Auth::id() }} });
+
+            Alpine.store('newMessages').updateFromServer();
+            setInterval(() => Alpine.store('newMessages').updateFromServer(), 5000);
+        });
     });
 </script>
 

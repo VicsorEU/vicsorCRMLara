@@ -22,6 +22,7 @@ class OnlineChatData extends Model
         'status',
         'type',
         'message',
+        'notified',
     ];
 
 

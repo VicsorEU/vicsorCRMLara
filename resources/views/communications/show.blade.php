@@ -97,10 +97,12 @@
                     message: '',
                     isOnline: false,
                     loading: false,
+                    refreshInterval: null,
 
                     async init() {
                         this.checkOnline();
                         await this.loadMessages();
+                        this.refreshInterval = setInterval(() => this.loadNewMessages(), 3000);
                     },
 
                     async loadMessages() {
@@ -125,6 +127,29 @@
                         } finally {
                             this.loading = false;
                             this.scrollToBottom();
+                        }
+                    },
+
+                    async loadNewMessages() {
+                        try {
+                            let route = '{{ route('online-chat.unread_count_messages', ['onlineChat' => ':id']) }}'.replace(':id', this.chat.id);
+                            const res = await fetch(route);
+                            if (!res.ok) return;
+
+                            const data = await res.json();
+                            if (!Array.isArray(data.messages) || data.messages.length === 0) return;
+
+                            data.messages.forEach(msg => {
+                                this.messages.push({
+                                    type: msg.type,
+                                    text: msg.message,
+                                    formattedTime: this.formatDateTime(msg.created_at)
+                                });
+                            });
+
+                            this.scrollToBottom();
+                        } catch (err) {
+                            console.error('Ошибка при автообновлении новых сообщений:', err);
                         }
                     },
 

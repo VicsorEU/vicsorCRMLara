@@ -3,75 +3,70 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\OnlineChats\OnlineChat;
-use App\Models\OnlineChats\OnlineChatData;
+use App\Http\Requests\Api\OnlineChat\StoreRequest;
+use App\Services\Communications\Api\OnlineChat\OnlineChatInterface;
 use App\Services\Communications\CommunicationInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class OnlineChatController extends Controller
 {
     protected CommunicationInterface $communicationService;
+    protected OnlineChatInterface $onlineChatService;
 
-    public function __construct(CommunicationInterface $communicationService)
+    public function __construct(CommunicationInterface $communicationService, OnlineChatInterface $onlineChatService)
     {
         $this->communicationService = $communicationService;
+        $this->onlineChatService = $onlineChatService;
     }
 
-    public function getSettings(string $token)
+    /**
+     * @param string $token
+     *
+     * @return JsonResponse
+     */
+    public function getSettings(string $token): JsonResponse
     {
-        $widget = OnlineChat::where('token', $token)->first();
-
-        if (!$widget) {
-            return response()->json(['success' => false, 'message' => 'Widget not found']);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'name' => $widget->name,
-                'work_days' => explode(',', $widget->work_days),
-                'work_from' => $widget->work_from,
-                'work_to' => $widget->work_to,
-                'widget_color' => $widget->widget_color,
-                'telegram' => $widget->telegram,
-                'instagram' => $widget->instagram,
-                'facebook' => $widget->facebook,
-                'viber' => $widget->viber,
-                'whatsapp' => $widget->whatsapp,
-                'title' => $widget->title,
-                'online_text' => $widget->online_text,
-                'offline_text' => $widget->offline_text,
-                'placeholder' => $widget->placeholder,
-                'greeting_offline' => $widget->greeting_offline,
-                'greeting_online' => $widget->greeting_online,
-                'pusher_key' => env('PUSHER_APP_KEY'),
-                'pusher_cluster' => env('PUSHER_APP_SECRET'),
-            ]
-        ]);
+        return response()->json($this->onlineChatService->getSettings($token));
     }
 
-
-    public function sendMessage(Request $request)
+    /**
+     * @param Request $request
+     *
+     * @return JsonResponse
+     */
+    public function sendMessage(Request $request): JsonResponse
     {
          return response()->json($this->communicationService->sendMessage($request));
     }
 
-    public function getMessages(string $token)
+    /**
+     * @param string $token
+     *
+     * @return JsonResponse
+     */
+    public function getMessages(string $token): JsonResponse
     {
-        $onlineChat = OnlineChat::where('token', $token)->first();
+        return response()->json($this->onlineChatService->getMessages($token));
+    }
 
-        if (!$onlineChat) {
-            return response()->json(['success' => false, 'message' => 'Chat not found']);
-        }
+    /**
+     * @param Request $request
+     *
+     * @return JsonResponse
+     */
+    public function checkOnNewMessages(Request $request): JsonResponse
+    {
+        return response()->json($this->onlineChatService->checkOnNewMessages($request));
+    }
 
-        $onlineChatData = OnlineChatData::query()
-            ->where('online_chat_id', $onlineChat->id)
-            ->orderByDesc('created_at')
-            ->get();
-
-        return response()->json([
-            'success'   => true,
-            'online_chat_data' => $onlineChatData,
-        ]);
+    /**
+     * @param StoreRequest $request
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateMessageStatus(StoreRequest $request): JsonResponse
+    {
+        return response()->json($this->onlineChatService->updateMessageStatus($request));
     }
 }

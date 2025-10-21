@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Communications;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Settings\OnlineChats\StoreRequest;
 use App\Models\OnlineChats\OnlineChat;
-use App\Models\OnlineChats\OnlineChatData;
 use App\Services\Communications\CommunicationInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class CommunicationController extends Controller
 {
@@ -20,34 +18,33 @@ class CommunicationController extends Controller
         $this->communicationService = $communicationService;
     }
 
-    public function index(Request $request)
+    /**
+     * @param Request $request
+     *
+     * @return View
+     */
+    public function index(Request $request): View
     {
         return view('communications.index', $this->communicationService->index($request));
     }
 
+    /**
+     * @param Request $request
+     *
+     * @return JsonResponse
+     */
     public function indexAjax(Request $request): JsonResponse
     {
         return response()->json($this->communicationService->renderTable($request));
     }
 
-    public function show(OnlineChat $chat)
+    /**
+     * @param OnlineChat $chat
+     *
+     * @return View
+     */
+    public function show(OnlineChat $chat): View
     {
         return view('communications.show', compact('chat'));
-    }
-
-    public function unreadCountMessages()
-    {
-        $unreadCountMessages = OnlineChatData::query()
-            ->where('type',OnlineChatData::TYPE_INCOMING)
-            ->where('status', OnlineChatData::STATUS_SENT)
-            ->with(['onlineChat' => function ($query) {
-                $query->where('user_id', Auth::id());
-            }])
-            ->count();
-
-        return response()->json([
-            'success' => true,
-            'count' => $unreadCountMessages,
-        ]);
     }
 }

@@ -8,6 +8,8 @@ use App\Services\Audits\AuditInterface;
 use App\Services\Audits\AuditService;
 use App\Services\Categories\CategoryInterface;
 use App\Services\Categories\CategoryService;
+use App\Services\Communications\Api\OnlineChat\OnlineChatInterface;
+use App\Services\Communications\Api\OnlineChat\OnlineChatService;
 use App\Services\Communications\CommunicationInterface;
 use App\Services\Communications\CommunicationService;
 use App\Services\Companies\CompanyInterface;
@@ -40,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CompanyInterface::class, CompanyService::class);
         $this->app->bind(ContactInterface::class, ContactService::class);
         $this->app->bind(CustomerInterface::class, CustomerService::class);
+        $this->app->bind(OnlineChatInterface::class, OnlineChatService::class);
         $this->app->bind(ProductInterface::class, ProductService::class);
         $this->app->bind(ShopInterface::class, ShopService::class);
         $this->app->bind(WarehouseInterface::class, WarehouseService::class);

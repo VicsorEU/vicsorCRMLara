@@ -24,7 +24,7 @@ class UpdateRequest extends FormRequest
             'user_id' => ['required', 'integer', 'exists:users,id'],
 
             // Основные параметры
-            'name' => ['required', 'string', 'max:255', 'unique:online_chats,name'],
+            'name' => ['required', 'string', 'max:255'],
 
             // Рабочее время
             'work_days' => ['required'],

@@ -1,6 +1,7 @@
 window.VicsorCRMChat = {
     pollingInterval: null,
     newMessageCount: 0,
+    lastMessageId: null, // чтобы знать, какие новые сообщения появились
 
     async init(config) {
         if (!config?.token) return console.error('Token is required!');
@@ -8,103 +9,91 @@ window.VicsorCRMChat = {
 
         console.log('%cИнициализация виджета VicsorCRM...', 'color: #4F46E5;');
 
-        const API_ORIGIN = (() => {
-            const host = window.location.hostname;
-            if (host.includes('local') || host.includes('127.0.0.1')) {
-                return 'http://vicsorcrmlara.local';
-            } else {
-                return 'https://vicsorcrm.vicsor.eu';
-            }
-        })();
+        const API_ORIGIN = window.location.hostname.includes('local')
+            ? 'http://vicsorcrmlara.local'
+            : 'https://vicsorcrm.vicsor.eu';
 
         const route = `${API_ORIGIN}/api/communications/online-chat/widget-settings/${config.token}`;
+
         try {
             const res = await fetch(route);
-            const contentType = res.headers.get('content-type');
-            if (!res.ok || !contentType || !contentType.includes('application/json')) {
-                console.error('API вернул не JSON или 404:', await res.text());
-                return;
-            }
-
             const settings = await res.json();
-
             if (!settings.success) return console.error('Widget settings not found');
+
             settings.data.token = config.token;
-            //
-            // // Загружаем Pusher
-            // if (!window.Pusher) {
-            //     await this.loadScript('https://js.pusher.com/7.2/pusher.min.js');
-            // }
-            //
-            // // Загружаем Echo
-            // if (!window.Echo) {
-            //     await this.loadScript('https://cdn.jsdelivr.net/npm/laravel-echo/dist/echo.iife.js');
-            // }
-            //
-            // window.EchoInstance = new window.Echo.default({
-            //     broadcaster: 'pusher',
-            //     key: settings.data.pusher_key,
-            //     cluster: settings.data.pusher_cluster,
-            //     forceTLS: true,
-            //     wsHost: `${settings.data.pusher_cluster}.pusher.com`,
-            //     wsPort: 80,
-            //     wssPort: 443,
-            //     enabledTransports: ['ws', 'wss', 'sockjs'], // fallback на SockJS
-            //     disableStats: true
-            // });
-            //
-            // console.log('%cEcho готов:', 'color: green;', window.EchoInstance);
-            //
-            // Подписка на канал
-            // this.subscribeForNotifications(settings.data);
 
             this.createChatButton(settings.data, API_ORIGIN);
+            this.startPolling(settings.data, API_ORIGIN, config.token);
+
         } catch (err) {
             console.error('Ошибка загрузки настроек:', err);
         }
     },
 
-    loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    },
+    // Проверяем новые сообщения каждые 20 секунд
+    startPolling(c, API_ORIGIN, token) {
+        if (this.pollingInterval) clearInterval(this.pollingInterval);
 
-    subscribeForNotifications(c) {
-        if (!c?.token) return console.error('Нет токена для подписки');
+        const doPoll = async () => {
+            try {
+                const url = `${API_ORIGIN}/api/communications/online-chat/check-new?token=${token}`;
+                const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!res.ok) {
+                    console.warn('[VicsorCRMChat] check-new returned not ok', res.status);
+                    return;
+                }
 
-        if (!window._widgetEchoListeners) window._widgetEchoListeners = {};
-        if (window._widgetEchoListeners[c.token]) return;
+                const data = await res.json();
+                console.log('%c[VicsorCRMChat] checkOnNewMessages result:', 'color: lime;', data);
 
-        console.log(`Подписка на канал: online-chat-tab.${c.token}`);
+                if (!data.messages || data.messages.length === 0) return;
 
-        try {
-            const channel = window.EchoInstance.private(`online-chat-tab.${c.token}`);
-            channel.listen('.new-message-online-chat-tab', (e) => {
-                console.log('Новое сообщение:', e);
-
-                const chat = document.getElementById('vicsorcrm-chat');
+                const newMessages = data.messages;
+                const chatElem = document.getElementById('vicsorcrm-chat');
                 const button = document.getElementById('vicsorcrm-chat-button');
 
-                if (!chat && button) {
-                    this.newMessageCount++;
-                    button.textContent = `💬 (${this.newMessageCount})`;
-                    button.style.transform = 'scale(1.2)';
-                    setTimeout(() => button.style.transform = 'scale(1)', 300);
-                } else if (chat) {
+                if (chatElem) {
                     const body = document.getElementById('vicsorcrm-chat-body');
-                    if (body) this.addMessage(body, e.message, e.type === 2 ? 'bot' : 'user');
-                }
-            });
 
-            window._widgetEchoListeners[c.token] = true;
-        } catch (err) {
-            console.error('Ошибка подписки на Echo:', err);
-        }
+                    Object.entries(newMessages).forEach(([key, msg]) => {
+                        if (msg && msg.type === 2) {
+                            this.addMessage(body, msg.message, 'bot');
+                        }
+                    })
+                } else if (button) {
+                        // чат закрыт — увеличиваем счётчик
+                        this.newMessageCount = data.count;
+
+                        // создаём или обновляем красный бейдж
+                        let badge = button.querySelector('.chat-notification-badge');
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'chat-notification-badge';
+                            Object.assign(badge.style, {
+                                position: 'absolute',
+                                top: '-5px',
+                                right: '-5px',
+                                background: 'red',
+                                color: '#fff',
+                                borderRadius: '50%',
+                                padding: '2px 6px',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                                pointerEvents: 'none'
+                            });
+                            button.appendChild(badge);
+                        }
+
+                        badge.textContent = this.newMessageCount;
+                    }
+            } catch (err) {
+                console.error('[VicsorCRMChat] Ошибка при polling:', err);
+            }
+        };
+
+        // первый вызов сразу
+        doPoll();
+        this.pollingInterval = setInterval(doPoll, 5000); // проверка каждые 5 секунд
     },
 
     createChatButton(c, API_ORIGIN) {
@@ -137,7 +126,6 @@ window.VicsorCRMChat = {
             const chat = document.getElementById('vicsorcrm-chat');
             if (chat) {
                 chat.remove();
-                clearInterval(this.pollingInterval);
                 return;
             }
             this.newMessageCount = 0;
@@ -145,7 +133,7 @@ window.VicsorCRMChat = {
             this.buildWidget(c, API_ORIGIN);
         });
 
-        console.log('Кнопка чата создана', 'color: green;');
+        console.log('%cКнопка чата создана', 'color: green;');
     },
 
     buildWidget(c, API_ORIGIN) {
@@ -241,32 +229,16 @@ window.VicsorCRMChat = {
     async loadMessages(c, body, API_ORIGIN, token) {
         try {
             const response = await fetch(`${API_ORIGIN}/api/communications/online-chat/messages/${token}`);
-            const contentType = response.headers.get('content-type');
-
-            if (!response.ok) {
-                const text = await response.text();
-                console.error(`Ошибка API: ${response.status}`, text);
-                this.addMessage(body, 'Не удалось загрузить сообщения. Попробуйте позже.', 'bot');
-                return;
-            }
-
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('API вернул не JSON:', text);
-                this.addMessage(body, 'Ошибка формата данных от сервера.', 'bot');
-                return;
-            }
-
             const data = await response.json();
-
-            if (!data.success || !Array.isArray(data.online_chat_data)) {
-                console.warn('Нет сообщений или неверный формат данных:', data);
-                return;
-            }
+            if (!data.success || !Array.isArray(data.online_chat_data)) return;
 
             body.innerHTML = '';
             const messages = data.online_chat_data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             messages.forEach(msg => this.addMessage(body, msg.message, msg.type === 2 ? 'bot' : 'user'));
+
+            if (messages.length > 0)
+                this.lastMessageId = messages[messages.length - 1].id;
+
             body.scrollTop = body.scrollHeight;
         } catch (err) {
             console.error('Ошибка загрузки сообщений', err);
@@ -285,43 +257,22 @@ window.VicsorCRMChat = {
         try {
             const response = await fetch(`${API_ORIGIN}/api/communications/online-chat/send`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 body: JSON.stringify({ token: c.token, message, type: 1 })
             });
 
-            if (!response.ok) {
-                const text = await response.text();
-                console.error(`Ошибка API при отправке: ${response.status}`, text);
-                this.addMessage(body, 'Ошибка отправки сообщения.', 'bot');
-                return;
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('API отправки вернул не JSON:', text);
-                this.addMessage(body, 'Ошибка формата ответа сервера.', 'bot');
-                return;
-            }
-
             const data = await response.json();
-            if (data.success) {
-                if (data.reply) this.addMessage(body, data.reply, 'bot');
-            } else {
-                console.warn('Сервер не вернул успешный ответ при отправке сообщения', data);
-            }
+            if (data.success && data.reply) this.addMessage(body, data.reply, 'bot');
         } catch (err) {
             console.error('Ошибка отправки сообщения', err);
             this.addMessage(body, 'Ошибка соединения с сервером.', 'bot');
         }
     },
 
-    addMessage(body, text, type = 'user') {
+    addMessage(body, text, type = 'user', msgId = null, API_ORIGIN = null) {
         const msg = document.createElement('div');
         msg.textContent = text;
+
         Object.assign(msg.style, {
             padding: '8px 10px',
             borderRadius: '10px',
@@ -331,7 +282,24 @@ window.VicsorCRMChat = {
             background: type === 'user' ? '#4F46E5' : '#f1f1f1',
             color: type === 'user' ? '#fff' : '#000'
         });
+
         body.appendChild(msg);
         body.scrollTop = body.scrollHeight;
+
+        if (type === 'bot' && msgId && API_ORIGIN) {
+            fetch(`${API_ORIGIN}/api/communications/online-chat/update-status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ id: msgId })
+            }).then(res => {
+                if (!res.ok) console.warn('Не удалось обновить статус сообщения', msgId);
+            }).catch(err => {
+                console.error('Ошибка при обновлении статуса сообщения:', err);
+            });
+        }
     }
+
 };

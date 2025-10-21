@@ -10,7 +10,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/ajax', [CommunicationController::class,'indexAjax'])->name('communications.index_ajax');
 
         Route::get('/communications/{chat}', [CommunicationController::class, 'show'])->name('communications.show');
-        Route::get('/unread-count-messages', [CommunicationController::class, 'unreadCountMessages'])->name('communications.unread_count_messages');
 
         Route::group(['prefix' => 'online-chat'], function () {
             Route::get('/{onlineChat}//unread-count-messages', [OnlineChatController::class, 'unreadCountMessages'])->name('online-chat.unread_count_messages');
@@ -19,5 +18,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/send', [OnlineChatController::class,'sendMessage'])->name('online_chat.send_message');
 
         });
+
+        Route::get('messages/check-new', [OnlineChatController::class, 'checkOnNewMessages'])->name('online-chat.check-new-messages');
     });
 });

@@ -17,6 +17,7 @@ return new class extends Migration
             $table->tinyInteger('status');
             $table->tinyInteger('type');
             $table->text('message')->nullable();
+            $table->tinyInteger('notified')->default(false);
             $table->timestamps();
         });
     }
