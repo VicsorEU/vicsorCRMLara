@@ -10,12 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class OnlineChatService implements OnlineChatInterface
 {
-    /**
-     * @param string $token
-     *
-     * @return array
-     */
-    public function getSettings(string $token): array
+
+    public function getSettings(string $token)
     {
         try {
             if (empty($token) || !is_string($token)) {
@@ -68,12 +64,8 @@ class OnlineChatService implements OnlineChatInterface
         }
     }
 
-    /**
-     * @param string $token
-     *
-     * @return array
-     */
-    public function getMessages(string $token): array
+
+    public function getMessages(string $token)
     {
         try {
             if (empty($token) || !is_string($token)) {
@@ -125,12 +117,7 @@ class OnlineChatService implements OnlineChatInterface
         }
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return array
-     */
-    public function checkOnNewMessages(Request $request): array
+    public function checkOnNewMessages(Request $request)
     {
         try {
             $token = $request->query('token');
@@ -186,12 +173,8 @@ class OnlineChatService implements OnlineChatInterface
         }
     }
 
-    /**
-     * @param StoreRequest $request
-     *
-     * @return array
-     */
-    public function updateMessageStatus(StoreRequest $request): array
+
+    public function updateMessageStatus(StoreRequest $request)
     {
         try {
             $request->validated();

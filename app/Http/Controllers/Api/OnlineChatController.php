@@ -20,52 +20,31 @@ class OnlineChatController extends Controller
         $this->onlineChatService = $onlineChatService;
     }
 
-    /**
-     * @param string $token
-     *
-     * @return JsonResponse
-     */
-    public function getSettings(string $token): JsonResponse
+
+    public function getSettings(string $token)
     {
         return response()->json($this->onlineChatService->getSettings($token));
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return JsonResponse
-     */
-    public function sendMessage(Request $request): JsonResponse
+
+    public function sendMessage(Request $request)
     {
          return response()->json($this->communicationService->sendMessage($request));
     }
 
-    /**
-     * @param string $token
-     *
-     * @return JsonResponse
-     */
-    public function getMessages(string $token): JsonResponse
+
+    public function getMessages(string $token)
     {
         return response()->json($this->onlineChatService->getMessages($token));
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return JsonResponse
-     */
-    public function checkOnNewMessages(Request $request): JsonResponse
+
+    public function checkOnNewMessages(Request $request)
     {
         return response()->json($this->onlineChatService->checkOnNewMessages($request));
     }
 
-    /**
-     * @param StoreRequest $request
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function updateMessageStatus(StoreRequest $request): JsonResponse
+    public function updateMessageStatus(StoreRequest $request)
     {
         return response()->json($this->onlineChatService->updateMessageStatus($request));
     }

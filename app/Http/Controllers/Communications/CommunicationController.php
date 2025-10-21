@@ -18,32 +18,17 @@ class CommunicationController extends Controller
         $this->communicationService = $communicationService;
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return View
-     */
-    public function index(Request $request): View
+    public function index(Request $request)
     {
         return view('communications.index', $this->communicationService->index($request));
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return JsonResponse
-     */
-    public function indexAjax(Request $request): JsonResponse
+    public function indexAjax(Request $request)
     {
         return response()->json($this->communicationService->renderTable($request));
     }
 
-    /**
-     * @param OnlineChat $chat
-     *
-     * @return View
-     */
-    public function show(OnlineChat $chat): View
+    public function show(OnlineChat $chat)
     {
         return view('communications.show', compact('chat'));
     }

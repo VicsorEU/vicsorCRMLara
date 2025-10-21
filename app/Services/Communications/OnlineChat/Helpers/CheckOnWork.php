@@ -7,12 +7,7 @@ use Illuminate\Support\Carbon;
 
 class CheckOnWork
 {
-    /**
-     * @param OnlineChat $onlineChat
-     *
-     * @return bool
-     */
-    static function isWork(OnlineChat $onlineChat): bool
+    static function isWork(OnlineChat $onlineChat)
     {
         $workDays = $onlineChat->work_days;
         $workFrom = $onlineChat->work_from;

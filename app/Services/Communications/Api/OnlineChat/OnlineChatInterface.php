@@ -7,31 +7,14 @@ use Illuminate\Http\Request;
 
 interface OnlineChatInterface
 {
-    /**
-     * @param string $token
-     *
-     * @return array
-     */
-    public function getSettings(string $token): array;
 
-    /**
-     * @param string $token
-     *
-     * @return array
-     */
-    public function getMessages(string $token): array;
+    public function getSettings(string $token);
 
-    /**
-     * @param Request $request
-     *
-     * @return array
-     */
-    public function checkOnNewMessages(Request $request): array;
 
-    /**
-     * @param StoreRequest $request
-     *
-     * @return array
-     */
-    public function updateMessageStatus(StoreRequest $request): array;
+    public function getMessages(string $token);
+
+
+    public function checkOnNewMessages(Request $request);
+
+    public function updateMessageStatus(StoreRequest $request);
 }

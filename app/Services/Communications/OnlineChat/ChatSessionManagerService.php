@@ -17,14 +17,7 @@ class ChatSessionManagerService
         $this->onlineChatService = $onlineChatService;
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     * @param string|null $message
-     * @param int $type
-     *
-     * @return OnlineChatData|null
-     */
-    public function handleMessage(OnlineChat $onlineChat, ?string $message, int $type): ?OnlineChatData
+    public function handleMessage(OnlineChat $onlineChat, ?string $message, int $type)
     {
         try {
             //        $isWork = CheckOnWork::isWork($onlineChat);

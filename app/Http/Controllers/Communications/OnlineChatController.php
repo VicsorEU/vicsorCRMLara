@@ -23,47 +23,26 @@ class OnlineChatController extends Controller
         $this->onlineChatService = $onlineChatService;
     }
 
-    /**
-     * @param StoreRequest $request
-     *
-     * @return JsonResponse
-     */
-    public function store(StoreRequest $request): JsonResponse
+    public function store(StoreRequest $request)
     {
         $data = $request->validated();
         return response()->json($this->communicationService->store($data));
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     *
-     * @return View
-     */
-    public function edit(OnlineChat $onlineChat): View
+    public function edit(OnlineChat $onlineChat)
     {
         $onlineChat->work_days_array = $onlineChat->work_days ? explode(',', $onlineChat->work_days) : [];
         return view('settings.online_chats.edit', compact('onlineChat'));
     }
 
-    /**
-     * @param UpdateRequest $request
-     * @param OnlineChat $onlineChat
-     *
-     * @return JsonResponse
-     */
-    public function update(UpdateRequest $request, OnlineChat $onlineChat): JsonResponse
+    public function update(UpdateRequest $request, OnlineChat $onlineChat)
     {
         $data = $request->validated();
 
         return response()->json($this->onlineChatService->updateCompanyChat($onlineChat, $data));
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     *
-     * @return JsonResponse
-     */
-    public function destroy(OnlineChat $onlineChat): JsonResponse
+    public function destroy(OnlineChat $onlineChat)
     {
         $onlineChat->delete();
         return response()->json([
@@ -71,42 +50,24 @@ class OnlineChatController extends Controller
         ]);
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     *
-     * @return JsonResponse
-     */
-    public function listOfMessages(OnlineChat $onlineChat): JsonResponse
+
+    public function listOfMessages(OnlineChat $onlineChat)
     {
         return response()->json($this->onlineChatService->listOfMessages($onlineChat));
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return JsonResponse
-     */
-    public function sendMessage(Request $request): JsonResponse
+
+    public function sendMessage(Request $request)
     {
         return response()->json([$this->communicationService->sendMessage($request)]);
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     *
-     * @return JsonResponse
-     */
-    public function unreadCountMessages(OnlineChat $onlineChat): JsonResponse
+    public function unreadCountMessages(OnlineChat $onlineChat)
     {
         return response()->json($this->onlineChatService->unreadCountMessages($onlineChat));
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return JsonResponse
-     */
-    public function checkOnNewMessages(Request $request): JsonResponse
+    public function checkOnNewMessages(Request $request)
     {
         return response()->json($this->onlineChatService->checkOnNewMessages($request));
     }

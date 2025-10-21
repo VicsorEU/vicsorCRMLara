@@ -20,12 +20,8 @@ class CommunicationService implements CommunicationInterface
         $this->chatSessionManagerService = $chatSessionManagerService;
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return array
-     */
-    public function index(Request $request): array
+
+    public function index(Request $request)
     {
         $section = $request->query('section', 'general');
         $search = trim((string)$request->get('search'));
@@ -70,11 +66,6 @@ class CommunicationService implements CommunicationInterface
         ];
     }
 
-    /**
-     * @param array $data
-     *
-     * @return array
-     */
     public function store(array $data): array
     {
         $type = $data['type'];
@@ -96,11 +87,6 @@ class CommunicationService implements CommunicationInterface
         ];
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return array
-     */
     public function renderTable(Request $request): array
     {
         $search = $request->get('search');
@@ -143,12 +129,7 @@ class CommunicationService implements CommunicationInterface
         }
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return array
-     */
-    public function sendMessage(Request $request): array
+    public function sendMessage(Request $request)
     {
         $token = $request->input('token');
         $message = $request->input('message');

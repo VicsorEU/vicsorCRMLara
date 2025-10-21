@@ -9,12 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class OnlineChatService
 {
-    /**
-     * @param array $data
-     *
-     * @return OnlineChat|null
-     */
-    public function createCompanyChat(array $data): ?OnlineChat
+    public function createCompanyChat(array $data)
     {
         try {
             $data['token'] = bin2hex(random_bytes(20));
@@ -28,13 +23,8 @@ class OnlineChatService
         }
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     * @param array $data
-     *
-     * @return array
-     */
-    public function updateCompanyChat(OnlineChat $onlineChat, array $data): array
+
+    public function updateCompanyChat(OnlineChat $onlineChat, array $data)
     {
         try {
             $data['work_days'] = implode(',', $data['work_days']);
@@ -58,14 +48,7 @@ class OnlineChatService
         }
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     * @param string $message
-     * @param int $type
-     *
-     * @return mixed
-     */
-    public function createMessage(OnlineChat $onlineChat, string $message, int $type): array
+    public function createMessage(OnlineChat $onlineChat, string $message, int $type)
     {
         return OnlineChatData::create([
             'online_chat_id' => $onlineChat->id,
@@ -75,12 +58,7 @@ class OnlineChatService
         ]);
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     *
-     * @return array
-     */
-    public function listOfMessages(OnlineChat $onlineChat): array
+    public function listOfMessages(OnlineChat $onlineChat)
     {
         try {
             $onlineChatData = OnlineChatData::query()
@@ -108,12 +86,7 @@ class OnlineChatService
         }
     }
 
-    /**
-     * @param OnlineChat $onlineChat
-     *
-     * @return array
-     */
-    public function unreadCountMessages(OnlineChat $onlineChat): array
+    public function unreadCountMessages(OnlineChat $onlineChat)
     {
         try {
             $messages = OnlineChatData::query()
@@ -142,12 +115,7 @@ class OnlineChatService
         }
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return array
-     */
-    public function checkOnNewMessages(Request $request): array
+    public function checkOnNewMessages(Request $request)
     {
         try {
             $query = OnlineChatData::query()
