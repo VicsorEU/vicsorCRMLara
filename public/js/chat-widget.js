@@ -1,13 +1,16 @@
 window.VicsorCRMChat = {
     pollingInterval: null,
     newMessageCount: 0,
-    lastMessageId: null, // чтобы знать, какие новые сообщения появились
+    lastMessageId: null,
 
     async init(config) {
-        if (!config?.token) return console.error('Token is required!');
-        if (document.getElementById('vicsorcrm-chat-button')) return;
+        if (!config?.token) return console.error('❌ Token is required!');
+        if (document.getElementById(`vicsorcrm-chat-button-${config.token}`)) {
+            console.warn(`[VicsorCRMChat] Виджет с токеном ${config.token} уже инициализирован`);
+            return;
+        }
 
-        console.log('%cИнициализация виджета VicsorCRM...', 'color: #4F46E5;');
+        console.log('%cИнициализация виджета VicsorCRM...', 'color: #4F46E5;', config);
 
         const API_ORIGIN = window.location.hostname.includes('local')
             ? 'http://vicsorcrmlara.local'
@@ -18,10 +21,13 @@ window.VicsorCRMChat = {
         try {
             const res = await fetch(route);
             const settings = await res.json();
-            if (!settings.success) return console.error('Widget settings not found');
+
+            if (!settings.success) {
+                console.error('⚠️ Widget settings not found for token:', config.token);
+                return;
+            }
 
             settings.data.token = config.token;
-
             this.createChatButton(settings.data, API_ORIGIN);
             this.startPolling(settings.data, API_ORIGIN, config.token);
 
@@ -30,7 +36,6 @@ window.VicsorCRMChat = {
         }
     },
 
-    // Проверяем новые сообщения каждые 20 секунд
     startPolling(c, API_ORIGIN, token) {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
 
@@ -38,69 +43,89 @@ window.VicsorCRMChat = {
             try {
                 const url = `${API_ORIGIN}/api/communications/online-chat/check-new?token=${token}`;
                 const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+
                 if (!res.ok) {
                     console.warn('[VicsorCRMChat] check-new returned not ok', res.status);
                     return;
                 }
 
                 const data = await res.json();
-                console.log('%c[VicsorCRMChat] checkOnNewMessages result:', 'color: lime;', data);
+                console.log('%c[VicsorCRMChat] checkOnNewMessages:', 'color: lime;', data);
 
                 if (!data.messages || data.messages.length === 0) return;
 
                 const newMessages = data.messages;
-                const chatElem = document.getElementById('vicsorcrm-chat');
-                const button = document.getElementById('vicsorcrm-chat-button');
+                const chatElem = document.getElementById(`vicsorcrm-chat-${token}`);
+                const button = document.getElementById(`vicsorcrm-chat-button-${token}`);
+
+                if (!chatElem && !button) {
+                    console.warn(`[VicsorCRMChat] Элементы для токена ${token} не найдены`);
+                    return;
+                }
 
                 if (chatElem) {
-                    const body = document.getElementById('vicsorcrm-chat-body');
+                    const body = document.getElementById(`vicsorcrm-chat-body-${token}`);
+                    if (!body || !document.body.contains(body)) {
+                        console.warn('❗ body не найден или удалён для токена', token);
+                        return;
+                    }
 
                     Object.entries(newMessages).forEach(([key, msg]) => {
                         if (msg && msg.type === 2) {
-                            this.addMessage(body, msg.message, 'bot');
+                            this.addMessage(body, msg.message, 'bot', msg.id, API_ORIGIN, msg.status);
                         }
-                    })
+                    });
                 } else if (button) {
-                        // чат закрыт — увеличиваем счётчик
-                        this.newMessageCount = data.count;
+                    this.newMessageCount = data.count;
+                    console.log('🟠 Новых сообщений:', this.newMessageCount);
 
-                        // создаём или обновляем красный бейдж
-                        let badge = button.querySelector('.chat-notification-badge');
-                        if (!badge) {
-                            badge = document.createElement('span');
-                            badge.className = 'chat-notification-badge';
-                            Object.assign(badge.style, {
-                                position: 'absolute',
-                                top: '-5px',
-                                right: '-5px',
-                                background: 'red',
-                                color: '#fff',
-                                borderRadius: '50%',
-                                padding: '2px 6px',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                pointerEvents: 'none'
-                            });
-                            button.appendChild(badge);
-                        }
-
-                        badge.textContent = this.newMessageCount;
+                    if (!button || !button.isConnected) {
+                        console.warn(`[VicsorCRMChat] Кнопка для токена ${token} отсутствует в DOM`);
+                        return;
                     }
+
+                    let badge = button.querySelector('.chat-notification-badge');
+
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'chat-notification-badge';
+                        Object.assign(badge.style, {
+                            position: 'absolute',
+                            top: '-5px',
+                            right: '-5px',
+                            background: 'red',
+                            color: '#fff',
+                            borderRadius: '50%',
+                            padding: '2px 6px',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            pointerEvents: 'none'
+                        });
+                        button.appendChild(badge);
+                    }
+
+                    if (badge && badge.classList && badge.isConnected) {
+                        badge.textContent = this.newMessageCount;
+                        badge.style.display = this.newMessageCount > 0 ? 'inline' : 'none';
+                    } else {
+                        console.warn('[VicsorCRMChat] badge уже удалён — пропускаем обновление');
+                    }
+                }
             } catch (err) {
                 console.error('[VicsorCRMChat] Ошибка при polling:', err);
             }
         };
 
-        // первый вызов сразу
         doPoll();
-        this.pollingInterval = setInterval(doPoll, 5000); // проверка каждые 5 секунд
+        this.pollingInterval = setInterval(doPoll, 5000);
     },
 
     createChatButton(c, API_ORIGIN) {
-        if (document.getElementById('vicsorcrm-chat-button')) return;
+        const btnId = `vicsorcrm-chat-button-${c.token}`;
+        if (document.getElementById(btnId)) return;
 
         const button = document.createElement('div');
-        button.id = 'vicsorcrm-chat-button';
+        button.id = btnId;
         Object.assign(button.style, {
             position: 'fixed',
             bottom: '20px',
@@ -123,22 +148,28 @@ window.VicsorCRMChat = {
         document.body.appendChild(button);
 
         button.addEventListener('click', () => {
-            const chat = document.getElementById('vicsorcrm-chat');
+            const chat = document.getElementById(`vicsorcrm-chat-${c.token}`);
             if (chat) {
                 chat.remove();
                 return;
             }
+
             this.newMessageCount = 0;
-            button.textContent = '💬';
+            const badge = button.querySelector('.chat-notification-badge');
+            if (badge) badge.remove();
+
             this.buildWidget(c, API_ORIGIN);
         });
 
-        console.log('%cКнопка чата создана', 'color: green;');
+        console.log('%cКнопка чата создана', 'color: green;', btnId);
     },
 
     buildWidget(c, API_ORIGIN) {
+        const chatId = `vicsorcrm-chat-${c.token}`;
+        if (document.getElementById(chatId)) return;
+
         const container = document.createElement('div');
-        container.id = 'vicsorcrm-chat';
+        container.id = chatId;
         Object.assign(container.style, {
             position: 'fixed',
             bottom: '90px',
@@ -154,6 +185,8 @@ window.VicsorCRMChat = {
             display: 'flex',
             flexDirection: 'column'
         });
+
+        const bodyId = `vicsorcrm-chat-body-${c.token}`;
 
         const now = new Date();
         const dayIndex = now.getDay();
@@ -176,7 +209,7 @@ window.VicsorCRMChat = {
         header.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span>${c.name || 'Онлайн чат'}</span>
-                <span id="vicsorcrm-chat-close" style="cursor:pointer;font-weight:bold;">✕</span>
+                <span id="vicsorcrm-chat-close-${c.token}" style="cursor:pointer;font-weight:bold;">✕</span>
             </div>
             <div style="font-size:12px;opacity:0.9;margin-top:2px;">
                 ${online ? c.online_text || 'Онлайн — готовы помочь' : c.offline_text || 'Оставьте сообщение — мы с вами свяжемся'}
@@ -193,7 +226,7 @@ window.VicsorCRMChat = {
         greeting.textContent = online ? (c.greeting_online || '') : (c.greeting_offline || '');
 
         const body = document.createElement('div');
-        body.id = 'vicsorcrm-chat-body';
+        body.id = bodyId;
         Object.assign(body.style, {
             flex: '1',
             padding: '12px',
@@ -208,7 +241,7 @@ window.VicsorCRMChat = {
         inputArea.innerHTML = `
             <textarea placeholder="${c.placeholder || 'Введите сообщение...'}"
                 style="width:100%; height:60px; border:1px solid #ddd; border-radius:8px; padding:8px; resize:none;"></textarea>
-            <button id="vicsorcrm-send"
+            <button id="vicsorcrm-send-${c.token}"
                 style="margin-top:8px; width:100%; background:${c.widget_color || '#4F46E5'}; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;">
                 Отправить
             </button>
@@ -220,8 +253,8 @@ window.VicsorCRMChat = {
         container.appendChild(inputArea);
         document.body.appendChild(container);
 
-        document.getElementById('vicsorcrm-chat-close').onclick = () => container.remove();
-        document.getElementById('vicsorcrm-send').onclick = () => this.sendMessage(c, body, API_ORIGIN);
+        document.getElementById(`vicsorcrm-chat-close-${c.token}`).onclick = () => container.remove();
+        document.getElementById(`vicsorcrm-send-${c.token}`).onclick = () => this.sendMessage(c, body, API_ORIGIN);
 
         this.loadMessages(c, body, API_ORIGIN, c.token);
     },
@@ -230,11 +263,15 @@ window.VicsorCRMChat = {
         try {
             const response = await fetch(`${API_ORIGIN}/api/communications/online-chat/messages/${token}`);
             const data = await response.json();
-            if (!data.success || !Array.isArray(data.online_chat_data)) return;
+
+            if (!data.success || !Array.isArray(data.online_chat_data)) {
+                console.warn('⚠️ Нет сообщений для чата', token);
+                return;
+            }
 
             body.innerHTML = '';
             const messages = data.online_chat_data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-            messages.forEach(msg => this.addMessage(body, msg.message, msg.type === 2 ? 'bot' : 'user'));
+            messages.forEach(msg => this.addMessage(body, msg.message, msg.type === 2 ? 'bot' : 'user',msg.id, null, msg.status));
 
             if (messages.length > 0)
                 this.lastMessageId = messages[messages.length - 1].id;
@@ -247,7 +284,8 @@ window.VicsorCRMChat = {
     },
 
     async sendMessage(c, body, API_ORIGIN) {
-        const textarea = document.querySelector('#vicsorcrm-chat textarea');
+        const textarea = document.querySelector(`#vicsorcrm-chat-${c.token} textarea`);
+        if (!textarea) return;
         const message = textarea.value.trim();
         if (!message) return;
 
@@ -269,10 +307,14 @@ window.VicsorCRMChat = {
         }
     },
 
-    addMessage(body, text, type = 'user', msgId = null, API_ORIGIN = null) {
+    addMessage(body, text, type = 'user', msgId = null, API_ORIGIN = null, status = null) {
+        if (!body) {
+            console.warn('❗ body отсутствует при добавлении сообщения');
+            return;
+        }
+
         const msg = document.createElement('div');
         msg.textContent = text;
-
         Object.assign(msg.style, {
             padding: '8px 10px',
             borderRadius: '10px',
@@ -286,7 +328,7 @@ window.VicsorCRMChat = {
         body.appendChild(msg);
         body.scrollTop = body.scrollHeight;
 
-        if (type === 'bot' && msgId && API_ORIGIN) {
+        if (type === 'bot' && msgId && status === 2 && API_ORIGIN) {
             fetch(`${API_ORIGIN}/api/communications/online-chat/update-status`, {
                 method: 'POST',
                 headers: {
@@ -294,12 +336,18 @@ window.VicsorCRMChat = {
                     'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify({ id: msgId })
-            }).then(res => {
-                if (!res.ok) console.warn('Не удалось обновить статус сообщения', msgId);
-            }).catch(err => {
-                console.error('Ошибка при обновлении статуса сообщения:', err);
-            });
+            })
+                .then(async res => {
+                    if (!res.ok) {
+                        const text = await res.text();
+                        console.warn('[VicsorCRMChat] Не удалось обновить статус сообщения', msgId, text);
+                    } else {
+                        console.log(`[VicsorCRMChat] Сообщение ${msgId} помечено как прочитанное`);
+                    }
+                })
+                .catch(err => {
+                    console.error('[VicsorCRMChat] Ошибка при обновлении статуса сообщения:', err);
+                });
         }
     }
-
 };

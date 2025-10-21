@@ -124,7 +124,8 @@
                 toast.innerHTML = `<strong>${title}</strong><br>${message}`;
 
                 toast.addEventListener('click', () => {
-                    if (chatId) window.location.href = `/communications/${chatId}`;
+                    const route = "{{ route('communications.show', ':chatId') }}".replace(':chatId', chatId);
+                    if (chatId) window.location.href = route;
                 });
 
                 container.appendChild(toast);
