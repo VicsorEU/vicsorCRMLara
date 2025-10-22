@@ -1,35 +1,35 @@
 @extends('layouts.app')
 
-@section('title', $chat->name)
-@section('page_title', $chat->name)
+@section('title', $onlineChat->name)
+@section('page_title', $onlineChat->name)
 
 @section('content')
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <section class="bg-gray-100 py-8 px-6">
         <div
-            x-data="singleChat(@js($chat))"
+            x-data="singleChat(@js($onlineChat))"
             x-init="init()"
             class="w-full h-[85vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl border bg-white max-w-4xl mx-auto"
-            :style="`border-color: ${chat.widget_color}`"
+            :style="`border-color: ${onlineChat.widget_color}`"
         >
             <!-- Шапка -->
             <header
                 class="flex items-center justify-between px-4 py-3 text-white shadow-sm"
-                :style="`background-color: ${chat.widget_color}`"
+                :style="`background-color: ${onlineChat.widget_color}`"
             >
                 <div class="flex items-center gap-3">
-                    <template x-if="chat.avatar">
-                        <img :src="chat.avatar" class="w-10 h-10 rounded-full object-cover border border-white/30">
+                    <template x-if="onlineChat.avatar">
+                        <img :src="onlineChat.avatar" class="w-10 h-10 rounded-full object-cover border border-white/30">
                     </template>
-                    <template x-if="!chat.avatar">
+                    <template x-if="!onlineChat.avatar">
                         <div class="w-10 h-10 rounded-full bg-white/25 flex items-center justify-center font-semibold text-lg uppercase">
-                            <span x-text="chat.name.charAt(0)"></span>
+                            <span x-text="onlineChat.name.charAt(0)"></span>
                         </div>
                     </template>
                     <div>
-                        <h1 class="text-base font-semibold leading-tight" x-text="chat.name"></h1>
-                        <p class="text-xs opacity-80" x-text="isOnline ? chat.online_text : chat.offline_text"></p>
+                        <h1 class="text-base font-semibold leading-tight" x-text="onlineChat.name"></h1>
+                        <p class="text-xs opacity-80" x-text="isOnline ? onlineChat.online_text : onlineChat.offline_text"></p>
                     </div>
                 </div>
             </header>
@@ -50,7 +50,7 @@
                             :class="msg.type === 2
                             ? 'text-white rounded-br-none'
                             : 'bg-white text-gray-800 rounded-bl-none border'"
-                            :style="msg.type === 2 ? `background-color: ${chat.widget_color}` : ''"
+                            :style="msg.type === 2 ? `background-color: ${onlineChat.widget_color}` : ''"
                         >
                             <span x-text="msg.text"></span>
                             <div class="text-[10px] mt-1 opacity-60 text-right" x-text="msg.formattedTime"></div>
@@ -60,7 +60,7 @@
 
                 <template x-if="!loading && messages.length === 0">
                     <div class="text-center text-gray-500 italic py-20"
-                         x-text="isOnline ? chat.greeting_online : chat.greeting_offline">
+                         x-text="isOnline ? onlineChat.greeting_online : onlineChat.greeting_offline">
                     </div>
                 </template>
             </main>
@@ -71,14 +71,14 @@
                     type="text"
                     x-model="message"
                     class="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2"
-                    :style="`--tw-ring-color: ${chat.widget_color}`"
-                    :placeholder="chat.placeholder"
+                    :style="`--tw-ring-color: ${onlineChat.widget_color}`"
+                    :placeholder="onlineChat.placeholder"
                     @keydown.enter.prevent="sendMessage"
                 >
                 <button
                     @click="sendMessage"
                     class="flex items-center justify-center w-10 h-10 rounded-full text-white shadow-md transition hover:opacity-90"
-                    :style="`background-color: ${chat.widget_color}`"
+                    :style="`background-color: ${onlineChat.widget_color}`"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12l14-7-5 7 5 7-14-7z" />
@@ -90,9 +90,9 @@
 
     @push('scripts')
         <script>
-            function singleChat(chat) {
+            function singleChat(onlineChat) {
                 return {
-                    chat,
+                    onlineChat,
                     messages: [],
                     message: '',
                     isOnline: false,
@@ -109,7 +109,7 @@
                         this.loading = true;
                         try {
                             let route = '{{ route('online_chat.messages', ['onlineChat' => ':id']) }}';
-                            route = route.replace(':id', this.chat.id);
+                            route = route.replace(':id', this.onlineChat.id);
 
                             const res = await fetch(route);
                             const data = await res.json();
@@ -132,7 +132,7 @@
 
                     async loadNewMessages() {
                         try {
-                            let route = '{{ route('online-chat.unread_count_messages', ['onlineChat' => ':id']) }}'.replace(':id', this.chat.id);
+                            let route = '{{ route('online-chat.unread_count_messages', ['onlineChat' => ':id']) }}'.replace(':id', this.onlineChat.id);
                             const res = await fetch(route);
                             if (!res.ok) return;
 
@@ -174,7 +174,7 @@
                                 },
                                 body: JSON.stringify({
                                     message: text,
-                                    token: this.chat.token,
+                                    token: this.onlineChat.token,
                                     type: 2,
                                 })
                             });
@@ -187,9 +187,9 @@
                         const now = new Date();
                         const currentDay = ['sun','mon','tue','wed','thu','fri','sat'][now.getDay()];
                         const time = now.toTimeString().slice(0,5);
-                        this.isOnline = this.chat.work_days.includes(currentDay)
-                            && time >= this.chat.work_from
-                            && time <= this.chat.work_to;
+                        this.isOnline = this.onlineChat.work_days.includes(currentDay)
+                            && time >= this.onlineChat.work_from
+                            && time <= this.onlineChat.work_to;
                     },
 
                     scrollToBottom() {

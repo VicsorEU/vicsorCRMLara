@@ -18,7 +18,6 @@
         </button>
     </div>
 
-    <!-- Создание -->
     <div x-show="activeTab === 'create'" x-transition>
         <div class="mb-4">
             <label for="chatType" class="block text-sm font-medium text-slate-600 mb-1">Тип чата</label>
@@ -27,7 +26,7 @@
                 <option value="">Выберите тип...</option>
                 <option value="onlineChat">Онлайн чат</option>
                 <option value="telegramChat">Телеграм чат</option>
-                <option value="emailChat">Канал</option>
+                <option value="emailChat">Email</option>
             </select>
         </div>
 
@@ -55,26 +54,73 @@
             chatType: '',
             token: '{{ csrf_token() }}',
 
-            init() {
-                // Вешаем обработчик на все кнопки удаления внутри таблицы
-                this.$nextTick(() => {
-                    const buttons = this.$el.querySelectorAll('button.delete-chat');
-                    buttons.forEach(btn => {
-                        btn.addEventListener('click', async (e) => {
-                            const chatId = e.currentTarget.dataset.chatId;
-                            await this.deleteChat(chatId);
-                        });
-                    });
-                });
+            daysRu: { mon: 'Пн', tue: 'Вт', wed: 'Ср', thu: 'Чт', fri: 'Пт', sat: 'Сб', sun: 'Нд' },
+
+            emailChat: {
+                type: 'emailChat',
+                user_id: '{{ auth()->id() }}',
+                name: 'Новый Email виджет',
+                email: 'example@gmail.com',
+                mail_type: 'gmail',
+                work_days: ['mon','tue','wed','thu','fri'],
+                work_from: '09:00',
+                work_to: '18:00',
+                widget_color: '#007bff',
+                submitting: false,
+                errors: {}
             },
 
-            async deleteChat(chatId) {
-                if (!confirm('Удалить чат?')) return;
+            // Метод для отображения дней недели
+            getDaysForView() {
+                return Object.entries(this.daysRu).map(([key, label]) => ({
+                    key,
+                    label,
+                    checked: this.emailChat.work_days.includes(key)
+                }));
+            },
 
-                const route = '{{ route('settings.widgets.destroy', ['onlineChat' => ':id']) }}'.replace(':id', chatId);
+            async submitEmailChat() {
+                this.emailChat.submitting = true;
+                this.emailChat.errors = {};
 
                 try {
+                    const route = '{{ route('settings.widgets.store') }}';
                     const res = await fetch(route, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.token,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(this.emailChat),
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok && data.success) {
+                        window.location.href = `${window.location.origin}/settings/widgets/edit?chat_id=${data.chat_id}&section=emails`;
+                    } else if (res.status === 422 || data.errors) {
+                        this.emailChat.errors = data.errors || {};
+                    } else {
+                        console.error('Ошибка:', data);
+                        alert('Произошла ошибка при создании виджета');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Ошибка соединения с сервером');
+                } finally {
+                    this.emailChat.submitting = false;
+                }
+            },
+
+            async deleteChat(chatId, section) {
+                if (!confirm('Удалить чат?')) return;
+
+                try {
+                    const url = `{{ route('settings.widgets.destroy') }}?chat_id=${chatId}&section=${section}`;
+
+                    const res = await fetch(url, {
                         method: 'DELETE',
                         headers: {
                             'X-CSRF-TOKEN': this.token,
@@ -83,19 +129,29 @@
                         credentials: 'same-origin'
                     });
 
-                    if (res.ok) {
-                        // Удаляем строку из таблицы
+                    const data = await res.json();
+
+                    if (res.ok && data.success) {
                         const row = document.querySelector(`#chat-${chatId}`);
                         if (row) row.remove();
                     } else {
-                        const text = await res.text();
-                        console.error('Ошибка при удалении чата:', text);
-                        alert('Ошибка при удалении чата');
+                        alert(data.message || 'Ошибка при удалении чата');
                     }
                 } catch (e) {
                     console.error(e);
-                    alert('Ошибка при соединении с сервером');
+                    alert('Ошибка соединения с сервером');
                 }
+            },
+
+            resetEmailChatForm() {
+                this.emailChat.name = '';
+                this.emailChat.email = '';
+                this.emailChat.mail_type = '';
+                this.emailChat.work_days = [];
+                this.emailChat.work_from = '09:00';
+                this.emailChat.work_to = '18:00';
+                this.emailChat.widget_color = '#0000ff';
+                this.emailChat.errors = {};
             }
         }
     }

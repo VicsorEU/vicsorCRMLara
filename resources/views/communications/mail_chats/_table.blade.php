@@ -1,3 +1,15 @@
+@php
+    $daysMap = [
+        'mon' => 'Пн',
+        'tue' => 'Вт',
+        'wed' => 'Ср',
+        'thu' => 'Чт',
+        'fri' => 'Пт',
+        'sat' => 'Сб',
+        'sun' => 'Вс',
+    ];
+@endphp
+
 <div x-data>
     <table class="min-w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
         <thead>
@@ -11,7 +23,7 @@
         @forelse($chats as $chat)
             <tr id="chat-{{ $chat->id }}" class="border-b hover:bg-gray-50 transition">
                 <td class="p-3">
-                    <a href="{{ route('communications.show', $chat->id) }}"
+                    <a href="{{ route('email-chat.show', $chat->id) }}"
                        class="text-blue-600 font-medium hover:underline relative inline-flex items-center chat-link"
                        data-chat-id="{{ $chat->id }}">
                         {{ $chat->name }}
@@ -31,7 +43,9 @@
                     {{ implode(', ', $daysRu) }}
                 </td>
 
-                <td class="p-3">{{ $chat->work_from }} — {{ $chat->work_to }}</td>
+                <td class="p-3">
+                    {{ date('H:i', strtotime($chat->work_from)) }} — {{ date('H:i', strtotime($chat->work_to)) }}
+                </td>
             </tr>
         @empty
             <tr>

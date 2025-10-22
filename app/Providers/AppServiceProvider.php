@@ -20,6 +20,8 @@ use App\Services\Customer\CustomerInterface;
 use App\Services\Customer\CustomerService;
 use App\Services\Products\ProductInterface;
 use App\Services\Products\ProductService;
+use App\Services\Settings\Widgets\WidgetInterface;
+use App\Services\Settings\Widgets\WidgetService;
 use App\Services\Shops\ShopInterface;
 use App\Services\Shops\ShopService;
 use App\Services\Warehouses\WarehouseInterface;
@@ -46,6 +48,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ProductInterface::class, ProductService::class);
         $this->app->bind(ShopInterface::class, ShopService::class);
         $this->app->bind(WarehouseInterface::class, WarehouseService::class);
+        $this->app->bind(WidgetInterface::class, WidgetService::class);
     }
 
     /**

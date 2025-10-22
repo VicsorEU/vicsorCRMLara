@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\MailChats\MailChat;
 use App\Models\OnlineChats\OnlineChat;
-use App\Models\OnlineChats\OnlineChatData;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -58,15 +59,26 @@ class SettingsController extends Controller
         }
 
         if ($section === 'widgets') {
-            $chats = OnlineChat::query()
-                ->orderByDesc('created_at')
-                ->paginate(15)
-                ->withQueryString();
+            $userId = Auth::id();
 
-            $chats->getCollection()->transform(function ($chat) {
-                $chat->type_chat = 'online сhat';
-                return $chat;
-            });
+            $onlineChatsQuery = OnlineChat::query()
+                ->select(['id', 'name', 'work_days', 'work_from', 'work_to', 'created_at',
+                    DB::raw("'online' as type_chat")
+                ])
+                ->where('user_id', $userId);
+
+            $mailChatsQuery = MailChat::query()
+                ->select(['id', 'name', 'work_days', 'work_from', 'work_to', 'created_at',
+                    DB::raw("'emails' as type_chat")
+                ])
+                ->where('user_id', $userId);
+
+            $combinedQuery = $onlineChatsQuery->unionAll($mailChatsQuery);
+
+            $chats = DB::table(DB::raw("({$combinedQuery->toSql()}) as combined"))
+                ->mergeBindings($combinedQuery->getQuery())
+                ->orderByDesc('created_at')
+                ->paginate(15);
 
             return view('settings.index', compact('section', 'chats'));
         }

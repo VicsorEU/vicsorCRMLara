@@ -122,7 +122,7 @@
                 toast.innerHTML = `<strong>${title}</strong><br>${message}`;
 
                 toast.addEventListener('click', () => {
-                    const route = "{{ route('communications.show', ':chatId') }}".replace(':chatId', chatId);
+                    const route = "{{ route('online-chat.show', ':chatId') }}".replace(':chatId', chatId);
                     if (chatId) window.location.href = route;
                 });
 

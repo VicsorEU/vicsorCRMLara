@@ -23,15 +23,10 @@ class OnlineChatService
         }
     }
 
-
     public function updateCompanyChat(OnlineChat $onlineChat, array $data)
     {
         try {
             $data['work_days'] = implode(',', $data['work_days']);
-
-            if (empty($data['token'])) {
-                $data['token'] = bin2hex(random_bytes(20));
-            }
 
             $onlineChat->update($data);
 

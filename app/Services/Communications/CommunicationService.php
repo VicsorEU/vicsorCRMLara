@@ -2,8 +2,10 @@
 
 namespace App\Services\Communications;
 
+use App\Models\MailChats\MailChat;
 use App\Models\OnlineChats\OnlineChat;
 use App\Models\OnlineChats\OnlineChatData;
+use App\Services\Communications\MailChat\MailChatService;
 use App\Services\Communications\OnlineChat\ChatSessionManagerService;
 use App\Services\Communications\OnlineChat\OnlineChatService;
 use Illuminate\Http\Request;
@@ -13,10 +15,16 @@ class CommunicationService implements CommunicationInterface
 {
     protected OnlineChatService $onlineChatService;
     protected ChatSessionManagerService $chatSessionManagerService;
+    protected MailChatService $mailChatService;
 
-    public function __construct(OnlineChatService $onlineChatService, ChatSessionManagerService $chatSessionManagerService)
+    public function __construct(
+        OnlineChatService $onlineChatService,
+        MailChatService $mailChatService,
+        ChatSessionManagerService $chatSessionManagerService
+    )
     {
         $this->onlineChatService = $onlineChatService;
+        $this->mailChatService = $mailChatService;
         $this->chatSessionManagerService = $chatSessionManagerService;
     }
 
@@ -55,6 +63,17 @@ class CommunicationService implements CommunicationInterface
                 break;
 
             case 'emails':
+                $chats = MailChat::query()
+                    ->where('user_id', Auth::id())
+                    ->when($search, function ($qq, $s) {
+                        $qq->where(fn($w)=>$w
+                            ->where('name','ILIKE',"%$s%")
+                            ->where('email','ILIKE',"%$s%")
+                            ->orWhere('title','ILIKE',"%$s%"));
+                    })
+                    ->orderByDesc('created_at')
+                    ->paginate(15)
+                    ->withQueryString();
 
                 break;
         }
@@ -79,6 +98,10 @@ class CommunicationService implements CommunicationInterface
 
         if ($type === 'onlineChat') {
             $chat = $this->onlineChatService->createCompanyChat($data);
+        }
+
+        if ($type === 'emailChat') {
+            $chat = $this->mailChatService->createMailChat($data);
         }
 
         return [
@@ -116,11 +139,28 @@ class CommunicationService implements CommunicationInterface
 
                 return [
                     'success' => true,
-                    'html' => view('communications._table', compact('chats'))->render(),
+                    'html' => view('communications.online_chats._table', compact('chats'))->render(),
                 ];
 
             case 'telegram': return [];
-            case 'emails' :return [];
+            case 'emails' :
+                $chats = MailChat::query()
+                    ->where('user_id', Auth::id())
+                    ->when($search, function ($qq, $s) {
+                        $qq->where(fn($w)=>$w
+                            ->where('name','ILIKE',"%$s%")
+                            ->where('email','ILIKE',"%$s%")
+                            ->orWhere('title','ILIKE',"%$s%"));
+                    })
+                    ->orderByDesc('created_at')
+                    ->paginate(15)
+                    ->withQueryString();
+
+                return [
+                    'success' => true,
+                    'html' => view('communications.mail_chats._table', compact('chats'))->render(),
+                ];
+
             default:
                 return [
                     'success' => true,

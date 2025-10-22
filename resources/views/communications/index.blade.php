@@ -10,63 +10,105 @@
 @endphp
 
 @section('content')
-    <div class="space-y-6">
+    <div x-data="widgetSettings()" x-init="init()">
         <div class="bg-white border rounded-2xl shadow-soft">
             <div class="px-5 py-3 border-b font-medium">Подразделы коммуникаций</div>
             <div class="p-5">
                 <nav class="flex flex-wrap gap-2">
-                    <a href="{{ route('communications.index') }}"
-                       class="px-3 py-1.5 rounded-lg border {{ $section==='general' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
+                    <button type="button"
+                            class="px-3 py-1.5 rounded-lg border flex items-center gap-2"
+                            :class="activeSection==='general' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50'"
+                            @click="setSection('general')">
                         Онлайн чат
-                    </a>
-                    <a href="{{ route('communications.index', ['section'=>'telegram']) }}"
-                       class="px-3 py-1.5 rounded-lg border {{ $section==='telegram' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
+                        <span class="chat-count inline-flex items-center justify-center w-5 h-5 text-xs font-semibold text-white bg-red-600 rounded-full" style="display: none;"></span>
+                    </button>
+                    <button type="button"
+                            class="px-3 py-1.5 rounded-lg border"
+                            :class="activeSection==='telegram' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50'"
+                            @click="setSection('telegram')">
                         Телеграм
-                    </a>
-                    <a href="{{ route('communications.index', ['section'=>'emails']) }}"
-                       class="px-3 py-1.5 rounded-lg border {{ $section==='emails' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50' }}">
+                    </button>
+                    <button type="button"
+                            class="px-3 py-1.5 rounded-lg border"
+                            :class="activeSection==='emails' ? 'bg-brand-50 border-brand-200 text-brand-700' : 'hover:bg-slate-50'"
+                            @click="setSection('emails')">
                         Emails
-                    </a>
+                    </button>
                 </nav>
             </div>
         </div>
 
-        @if($section === 'general')
-            <div x-data="widgetSettings()" x-init="init()">
-                <div class="bg-white border rounded-2xl shadow-soft">
-                    <div class="p-5">
-                        <div id="communicationTable" x-html="tableHtml"></div>
-                    </div>
-                </div>
+        <div class="mt-5 bg-white border rounded-2xl shadow-soft">
+            <div class="p-5">
+                <div id="communicationTable" x-html="tableHtml"></div>
             </div>
-        @endif
+        </div>
     </div>
-
+    <script type="text/javascript">
+        (function(w,d,t,u,c){
+            var s=d.createElement(t),
+                j=d.getElementsByTagName(t)[0];
+            s.src = u;
+            s.async = true;
+            s.defer = true;
+            s.onload = function() {
+                if(typeof VicsorCRMChat !== "undefined"){
+                    VicsorCRMChat.init(c);
+                } else {
+                    console.error("VicsorCRMChat script failed to load.");
+                }
+            };
+            j.parentNode.insertBefore(s,j);
+        })(window, document, "script", "http://vicsorcrmlara.local/js/chat-widget.js", {
+            token: "3d4c64eaf6a03422802468c64ee9bd182a2c366d"
+        });</script>
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('widgetSettings', () => ({
-                chats: [],
-                chatIds: [],
+                activeSection: '{{ $section }}',
                 tableHtml: '',
                 token: document.querySelector('meta[name="csrf-token"]').content,
 
-                async init() {
-                    await this.loadChats();
+                init() {
+                    this.loadChats(this.activeSection);
                 },
 
-                async loadChats() {
+                async setSection(section) {
+                    this.activeSection = section;
+
+                    const url = new URL(window.location);
+                    if (section === 'general') {
+                        url.searchParams.delete('section');
+                    } else {
+                        url.searchParams.set('section', section);
+                    }
+                    window.history.replaceState({}, '', url);
+
+                    await this.loadChats(section);
+                },
+
+                async loadChats(section) {
                     try {
-                        const res = await fetch("{{ route('communications.index_ajax') }}");
+                        const res = await fetch("{{ route('communications.index_ajax') }}?section=" + section);
                         const data = await res.json();
-                        this.chats = data.chats || [];
-                        this.tableHtml = data.html || '';
-                        this.chatIds = this.chats.map(c => c.id);
-                        await this.$nextTick();
+                        this.tableHtml = data.html || '<p class="text-gray-500">Нет данных</p>';
                     } catch (err) {
                         console.error('Ошибка при загрузке чатов:', err);
+                        this.tableHtml = '<p class="text-red-600">Ошибка при загрузке данных</p>';
                     }
-                },
+                }
             }));
+        });
+        document.addEventListener('alpine:init', () => {
+            Alpine.effect(() => {
+                const store = Alpine.store('newMessages');
+                if (!store) return;
+                const count = store.count ?? 0;
+                document.querySelectorAll('.chat-count').forEach(el => {
+                    el.textContent = count;
+                    el.style.display = count > 0 ? 'inline-flex' : 'none';
+                });
+            });
         });
     </script>
 @endsection

@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Communications\OnlineChatController;
+use App\Http\Controllers\WidgetController;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\SettingsController;
@@ -66,8 +66,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/settings/roles/{role}',        [RolesCtrl::class,'destroy'])
         ->whereNumber('role')->middleware('access:settings,full')->name('settings.users.roles.destroy');
 
-    Route::get('/settings/widgets/{onlineChat}/edit', [OnlineChatController::class,'edit'])->name('settings.widgets.edit');
-    Route::post('/settings/widgets/store', [OnlineChatController::class,'store'])->name('settings.widgets.store');
-    Route::put('/settings/widgets/{onlineChat}/update', [OnlineChatController::class,'update'])->name('settings.widgets.update');
-    Route::delete('/settings/widgets/{onlineChat}/destroy', [OnlineChatController::class,'destroy'])->name('settings.widgets.destroy');
+    Route::get('/settings/widgets/edit', [WidgetController::class,'edit'])->name('settings.widgets.edit');
+    Route::post('/settings/widgets/store', [WidgetController::class,'store'])->name('settings.widgets.store');
+    Route::put('/settings/widgets/update', [WidgetController::class,'update'])->name('settings.widgets.update');
+    Route::delete('/settings/widgets/destroy', [WidgetController::class,'destroy'])->name('settings.widgets.destroy');
 });

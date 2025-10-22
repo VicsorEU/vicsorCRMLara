@@ -4,8 +4,9 @@
 @section('page_title', 'Редактирование виджета')
 
 @section('content')
-    <div x-data="onlineChatEditor(@js($onlineChat))" x-init="init()" class="bg-white border rounded-2xl shadow-soft p-6">
-        <h1 class="text-2xl font-semibold mb-4">Редактирование виджета</h1>
+    <div x-data="onlineChatEditor(@js($onlineChat))" x-init="init()"
+         class="bg-white border rounded-2xl shadow-soft p-6">
+        <h1 class="text-2xl font-semibold mb-4">Редактирование {{ $onlineChat->name }}</h1>
 
         <div x-show="errors.general" class="mb-4 text-red-600">
             <template x-for="err in errors.general" :key="err">
@@ -152,10 +153,12 @@
 
                     form: {
                         user_id: '{{ Auth::id() }}',
+                        chat_id: onlineChat.id,
+                        section: 'general',
                         type: 'onlineChat',
                         name: onlineChat.name ?? '',
                         token: onlineChat.token ?? '',
-                        work_days: @json($onlineChat->work_days_array) ?? [],
+                        work_days: @json($onlineChat->work_days_array ?? []),
                         work_from: onlineChat.work_from ?? '09:00',
                         work_to: onlineChat.work_to ?? '18:00',
                         widget_color: onlineChat.widget_color ?? '#007bff',
@@ -188,51 +191,51 @@
                     })(window, document, "script", "${scriptUrl}", {
                         token: "{{ $onlineChat->token }}"
                     });<\/script>`
-                },
+                    },
 
                     async save() {
-                    this.saving = true;
-                    this.errors = {};
+                        this.saving = true;
+                        this.errors = {};
 
-                    try {
-                        const res = await fetch('{{ route('settings.widgets.update', $onlineChat->id) }}', {
-                            method: 'PUT',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-                            },
-                            body: JSON.stringify(this.form)
-                        });
+                        try {
+                            const res = await fetch('{{ route('settings.widgets.update') }}', {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                                },
+                                body: JSON.stringify(this.form)
+                            });
 
-                        const data = await res.json();
+                            const data = await res.json();
 
-                        if (data.errors) {
-                            // выводим ошибки в поля
-                            this.errors = data.errors;
-                            return;
+                            if (data.errors) {
+                                // выводим ошибки в поля
+                                this.errors = data.errors;
+                                return;
+                            }
+
+                            if (data.success) {
+                                // успешное сохранение
+                                window.location.href = '{{ route('settings.index', ['section' => 'widgets']) }}';
+                            } else {
+                                // общая ошибка сервера
+                                this.errors.general = ['Ошибка при сохранении данных'];
+                            }
+
+                        } catch (e) {
+                            console.error(e);
+                            this.errors.general = ['Ошибка соединения с сервером'];
+                        } finally {
+                            this.saving = false;
                         }
+                    },
 
-                        if (data.success) {
-                            // успешное сохранение
-                            window.location.href = '{{ route('settings.index', ['section' => 'widgets']) }}';
-                        } else {
-                            // общая ошибка сервера
-                            this.errors.general = ['Ошибка при сохранении данных'];
-                        }
-
-                    } catch (e) {
-                        console.error(e);
-                        this.errors.general = ['Ошибка соединения с сервером'];
-                    } finally {
-                        this.saving = false;
+                    resetForm() {
+                        window.location.href = '{{ route('settings.index', ['section' => 'widgets']) }}';
                     }
-                },
-
-                resetForm() {
-                    window.location.href = '{{ route('settings.index', ['section' => 'widgets']) }}';
-                }
-            }));
+                }));
             });
         </script>
     @endpush

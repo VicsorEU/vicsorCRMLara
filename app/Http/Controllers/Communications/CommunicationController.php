@@ -3,11 +3,8 @@
 namespace App\Http\Controllers\Communications;
 
 use App\Http\Controllers\Controller;
-use App\Models\OnlineChats\OnlineChat;
 use App\Services\Communications\CommunicationInterface;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 class CommunicationController extends Controller
 {
@@ -26,10 +23,5 @@ class CommunicationController extends Controller
     public function indexAjax(Request $request)
     {
         return response()->json($this->communicationService->renderTable($request));
-    }
-
-    public function show(OnlineChat $chat)
-    {
-        return view('communications.show', compact('chat'));
     }
 }

@@ -186,7 +186,7 @@
         @endif
 
         @if($section === 'widgets')
-            <div x-data="widgetSettings()" x-init="init()" class="bg-white rounded-2xl shadow-xl p-6">
+            <div x-data="widgetSettings()" class="bg-white rounded-2xl shadow-xl p-6">
                 @include('settings.online_chats.create_chat_widgets')
             </div>
         @endif
@@ -359,7 +359,7 @@
                 submitting: false,
                 errors: [],
                 name: 'Введите название виджета',
-                work_days: [],
+                work_days: ['mon','tue','wed','thu','fri'],
                 work_from: '09:00',
                 work_to: '18:00',
                 widget_color: '#0000ff',
