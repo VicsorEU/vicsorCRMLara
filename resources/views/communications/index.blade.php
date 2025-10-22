@@ -44,24 +44,7 @@
             </div>
         </div>
     </div>
-    <script type="text/javascript">
-        (function(w,d,t,u,c){
-            var s=d.createElement(t),
-                j=d.getElementsByTagName(t)[0];
-            s.src = u;
-            s.async = true;
-            s.defer = true;
-            s.onload = function() {
-                if(typeof VicsorCRMChat !== "undefined"){
-                    VicsorCRMChat.init(c);
-                } else {
-                    console.error("VicsorCRMChat script failed to load.");
-                }
-            };
-            j.parentNode.insertBefore(s,j);
-        })(window, document, "script", "http://vicsorcrmlara.local/js/chat-widget.js", {
-            token: "3d4c64eaf6a03422802468c64ee9bd182a2c366d"
-        });</script>
+
     <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('widgetSettings', () => ({
