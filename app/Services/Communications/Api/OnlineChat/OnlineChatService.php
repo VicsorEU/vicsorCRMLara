@@ -97,7 +97,10 @@ class OnlineChatService implements OnlineChatInterface
             }
 
             foreach ($onlineChatData as $message) {
-                if ($message->status !== OnlineChatData::STATUS_READ) {
+                if (
+                    $message->status === OnlineChatData::STATUS_SENT
+                    && $message->type === OnlineChatData::TYPE_OUTGOING
+                ) {
                     $message->update(['status' => OnlineChatData::STATUS_READ]);
                 }
             }

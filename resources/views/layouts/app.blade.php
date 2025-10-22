@@ -45,12 +45,10 @@
             <x-nav.link href="{{ route('projects.index') }}" :active="request()->routeIs('projects.*')">Проекты</x-nav.link>
             <x-nav.link href="{{ route('communications.index') }}" :active="request()->routeIs('communications.*')" class="relative flex items-center gap-2">
                 <span>Коммуникации</span>
-                <template x-if="$store.newMessages.count > 0">
-        <span
-            x-text="$store.newMessages.count"
-            class="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-semibold rounded-full px-1.5 py-0.5 leading-none shadow"
-        ></span>
-                </template>
+                <span data-nav-counter
+                      x-text="$store.newMessages.count"
+                      class="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-semibold rounded-full px-1.5 py-0.5 leading-none shadow hidden">
+                </span>
             </x-nav.link>
             @endcanAccess
             <x-nav.link href="{{ route('audit.index') }}" :active="request()->routeIs('audit.*')">Журнал</x-nav.link>
@@ -188,6 +186,21 @@
 
             Alpine.store('newMessages').updateFromServer();
             setInterval(() => Alpine.store('newMessages').updateFromServer(), 5000);
+        });
+    });
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.effect(() => {
+            const store = Alpine.store('newMessages');
+            if (!store) return;
+
+            // Ждем, пока элемент в меню появится
+            const badge = document.querySelector('[data-nav-counter]');
+            if (!badge) return;
+
+            const count = store.count ?? 0;
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'inline-flex' : 'none';
         });
     });
 </script>
