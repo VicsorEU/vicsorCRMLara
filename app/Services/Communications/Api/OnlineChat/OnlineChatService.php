@@ -5,6 +5,7 @@ namespace App\Services\Communications\Api\OnlineChat;
 use App\Http\Requests\Api\OnlineChat\StoreRequest;
 use App\Models\OnlineChats\OnlineChat;
 use App\Models\OnlineChats\OnlineChatData;
+use App\Models\OnlineChats\OnlineChatUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -65,13 +66,21 @@ class OnlineChatService implements OnlineChatInterface
     }
 
 
-    public function getMessages(string $token)
+    public function getMessages(string $token, string $authId)
     {
         try {
             if (empty($token) || !is_string($token)) {
                 return [
                     'success' => false,
                     'message' => 'Invalid token'
+                ];
+            }
+
+            if (empty($authId) || !is_string($authId)) {
+                return [
+                    'success' => false,
+                    'message' => 'Invalid or missing auth_id',
+                    'messages' => []
                 ];
             }
 
@@ -83,7 +92,19 @@ class OnlineChatService implements OnlineChatInterface
                 ];
             }
 
+            $onlineChatUser = OnlineChatUser::query()
+                ->where('auth_id', $authId)
+                ->first();
+            if (!$onlineChatUser) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found',
+                    'messages' => []
+                ];
+            }
+
             $onlineChatData = OnlineChatData::query()
+                ->where('online_chat_user_id', $onlineChatUser->id)
                 ->where('online_chat_id', $onlineChat->id)
                 ->orderByDesc('created_at')
                 ->get();
@@ -132,6 +153,15 @@ class OnlineChatService implements OnlineChatInterface
                 ];
             }
 
+            $authId = $request->query('auth_id');
+            if (empty($authId) || !is_string($authId)) {
+                return [
+                    'success' => false,
+                    'message' => 'Invalid or missing auth_id',
+                    'messages' => []
+                ];
+            }
+
             $onlineChatExists = OnlineChat::where('token', $token)->exists();
             if (!$onlineChatExists) {
                 return [
@@ -141,7 +171,19 @@ class OnlineChatService implements OnlineChatInterface
                 ];
             }
 
+            $onlineChatUser = OnlineChatUser::query()
+                ->where('auth_id', $authId)
+                ->first();
+            if (!$onlineChatUser) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found',
+                    'messages' => []
+                ];
+            }
+
             $query = OnlineChatData::query()
+                ->where('online_chat_user_id', $onlineChatUser->id)
                 ->where('type', OnlineChatData::TYPE_OUTGOING)
                 ->where('status', OnlineChatData::STATUS_SENT)
                 ->whereHas('onlineChat', function ($q) use ($token) {

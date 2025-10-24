@@ -17,17 +17,18 @@ class ChatSessionManagerService
         $this->onlineChatService = $onlineChatService;
     }
 
-    public function handleMessage(OnlineChat $onlineChat, ?string $message, int $type)
+    public function handleMessage(OnlineChat $onlineChat, ?string $message, int $type, ?int $onlineChatUserId, ?string $sourceUrl)
     {
         try {
             //        $isWork = CheckOnWork::isWork($onlineChat);
 
             OnlineChatData::query()
+                ->where('online_chat_user_id', $onlineChatUserId)
                 ->where('online_chat_id', $onlineChat->id)
                 ->whereNot('type', $type)
                 ->update(['status' => OnlineChatData::STATUS_READ]);
 
-            $onlineChatData = $this->onlineChatService->createMessage($onlineChat, $message, $type);
+            $onlineChatData = $this->onlineChatService->createMessage($onlineChat, $message, $type, $onlineChatUserId, $sourceUrl);
             $this->updateMessageStatus($onlineChatData, OnlineChatData::STATUS_SENT);
 
             return $onlineChatData;

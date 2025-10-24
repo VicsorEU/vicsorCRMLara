@@ -11,13 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('online_chat_data', function (Blueprint $table) {
+        Schema::create('online_chat_users', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('online_chat_id');
-            $table->tinyInteger('status');
-            $table->tinyInteger('type');
-            $table->text('message')->nullable();
-            $table->tinyInteger('notified')->default(false);
+            $table->string('auth_id')->unique();
+            $table->string('name')->nullable();
             $table->timestamps();
         });
     }
@@ -27,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('online_chat_data');
+        Schema::dropIfExists('online_chat_users');
     }
 };

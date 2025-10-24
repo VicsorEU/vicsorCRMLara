@@ -19,16 +19,21 @@ class OnlineChatData extends Model
 
     protected $fillable = [
         'online_chat_id',
+        'online_chat_user_id',
         'status',
         'type',
         'message',
+        'source_url',
         'notified',
     ];
-
-
 
     public function onlineChat():  BelongsTo
     {
         return $this->belongsTo(OnlineChat::class, 'online_chat_id', 'id');
+    }
+
+    public function onlineChatUser():  BelongsTo
+    {
+        return $this->belongsTo(OnlineChatUser::class, 'online_chat_user_id', 'id');
     }
 }

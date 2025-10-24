@@ -44,4 +44,9 @@ class OnlineChat extends Model
     {
         return $this->hasMany(OnlineChatData::class, 'online_chat_id', 'id');
     }
+
+    public function onlineChatUsers(): HasMany
+    {
+        return $this->hasMany(OnlineChatData::class, 'online_chat_user_id', 'id');
+    }
 }

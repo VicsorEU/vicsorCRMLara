@@ -3,8 +3,10 @@
 namespace App\Services\Communications;
 
 use App\Models\MailChats\MailChat;
+use App\Models\MailChats\MailChatData;
 use App\Models\OnlineChats\OnlineChat;
 use App\Models\OnlineChats\OnlineChatData;
+use App\Models\OnlineChats\OnlineChatUser;
 use App\Services\Communications\MailChat\MailChatService;
 use App\Services\Communications\OnlineChat\ChatSessionManagerService;
 use App\Services\Communications\OnlineChat\OnlineChatService;
@@ -71,6 +73,9 @@ class CommunicationService implements CommunicationInterface
                             ->where('email','ILIKE',"%$s%")
                             ->orWhere('title','ILIKE',"%$s%"));
                     })
+                    ->withCount(['mailChatData as unread_messages_count' => function ($q) {
+                        $q->where('status', MailChatData::STATUS_SENT);
+                    }])
                     ->orderByDesc('created_at')
                     ->paginate(15)
                     ->withQueryString();
@@ -102,6 +107,13 @@ class CommunicationService implements CommunicationInterface
 
         if ($type === 'emailChat') {
             $chat = $this->mailChatService->createMailChat($data);
+        }
+
+        if (empty($chat)) {
+            return [
+                'success' => false,
+                'message' => 'Could not create chat!'
+            ];
         }
 
         return [
@@ -171,8 +183,19 @@ class CommunicationService implements CommunicationInterface
 
     public function sendMessage(Request $request)
     {
-        $token = $request->input('token');
-        $message = $request->input('message');
+        $token = $request->get('token');
+        $message = $request->get('message');
+        $authId = $request->get('auth_id');
+        $type = $request->get('type');
+        $sourceUrl = $request->get('source_url') ?? null;
+
+        if (empty($authId)) {
+            return [
+                'success' => false,
+                'message' => 'Invalid or missing auth_id',
+                'messages' => []
+            ];
+        }
 
         $onlineChat = OnlineChat::query()->where('token', $token)->first();
         if (empty($onlineChat)) {
@@ -182,9 +205,24 @@ class CommunicationService implements CommunicationInterface
             ];
         }
 
-        $type = $request->get('type');
+        $onlineChatUserQuery = OnlineChatUser::query();
 
-        $this->chatSessionManagerService->handleMessage($onlineChat, $message, $type);
+        if ($type === OnlineChatData::TYPE_INCOMING) {
+            $onlineChatUserQuery->where('auth_id', $authId);
+        } else {
+            $onlineChatUserQuery->where('id', $authId);
+        }
+
+        $onlineChatUser = $onlineChatUserQuery->first();;
+        if (!$onlineChatUser) {
+            return [
+                'success' => false,
+                'message' => 'User not found',
+                'messages' => []
+            ];
+        }
+
+        $this->chatSessionManagerService->handleMessage($onlineChat, $message, $type, $onlineChatUser->id, $sourceUrl);
 
         return [
             'success' => true,

@@ -8,7 +8,8 @@ Route::prefix('communications/online-chat')->group(function () {
     Route::post('send', [OnlineChatController::class, 'sendMessage'])->name('online-chat.send.message');
 
     Route::get('check-new', [OnlineChatController::class, 'checkOnNewMessages'])->name('online-chat.check-new-messages');
-    Route::get('messages/{token}', [OnlineChatController::class, 'getMessages'])->name('online-chat.messages');
+    Route::get('messages/{token}/{authId}', [OnlineChatController::class, 'getMessages'])->name('online-chat.messages');
 
     Route::post('update-status', [OnlineChatController::class, 'updateMessageStatus'])->name('online-chat.update-status');
+    Route::post('register-user', [OnlineChatController::class, 'registerUser']);
 });

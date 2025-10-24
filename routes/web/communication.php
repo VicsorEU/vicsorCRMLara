@@ -12,8 +12,9 @@ Route::middleware('auth')->group(function () {
 
         Route::group(['prefix' => 'online-chat'], function () {
             Route::get('/{onlineChat}', [OnlineChatController::class, 'show'])->name('online-chat.show');
-            Route::get('/{onlineChat}//unread-count-messages', [OnlineChatController::class, 'unreadCountMessages'])->name('online-chat.unread_count_messages');
+            Route::get('/{onlineChat}/{onlineChatUser}/unread-count-messages', [OnlineChatController::class, 'unreadCountMessages'])->name('online-chat.unread_count_messages');
 
+            Route::get('/{onlineChat}/users-list', [OnlineChatController::class,'listOfUsers'])->name('online_chat.users_list');
             Route::get('/{onlineChat}/messages', [OnlineChatController::class,'listOfMessages'])->name('online_chat.messages');
             Route::post('/send', [OnlineChatController::class,'sendMessage'])->name('online_chat.send_message');
         });
@@ -21,6 +22,8 @@ Route::middleware('auth')->group(function () {
         Route::group(['prefix' => 'email-chat'], function () {
             Route::get('/{mailChat}', [MailChatController::class, 'show'])->name('email-chat.show');
             Route::get('/{mailChat}/messages', [MailChatController::class,'listOfMessages'])->name('email-chat.messages');
+
+            Route::post('/{mailChat}/send', [MailChatController::class,'sendMessage'])->name('email-chat.send_message');
         });
 
         Route::get('messages/check-new', [OnlineChatController::class, 'checkOnNewMessages'])->name('online-chat.check-new-messages');

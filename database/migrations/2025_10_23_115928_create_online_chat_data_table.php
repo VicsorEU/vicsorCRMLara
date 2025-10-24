@@ -1,0 +1,34 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('online_chat_data', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('online_chat_id');
+            $table->unsignedBigInteger('online_chat_user_id')->nullable()->after('online_chat_id');
+            $table->tinyInteger('status');
+            $table->tinyInteger('type');
+            $table->text('message')->nullable();
+            $table->string('source_url')->nullable();
+            $table->tinyInteger('notified')->default(false);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('online_chat_data');
+    }
+};
